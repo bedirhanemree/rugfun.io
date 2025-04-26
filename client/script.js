@@ -11,8 +11,8 @@ const socket = io();
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-const mapWidth = 50000;
-const mapHeight = 50000;
+const mapWidth = 15000;
+const mapHeight = 15000;
 
 let gameStarted = false;
 let gameOver = false;
