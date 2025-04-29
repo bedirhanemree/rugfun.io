@@ -81,10 +81,10 @@ let boostTimer = 0;
 let particles = [];
 
 const foodTypes = [
-    { emoji: "🐛", min: 100, max: 1000, speed: 0.2, size: 8, color: "#66ff66" },
-    { emoji: "🐟", min: 1000, max: 5000, speed: 0.4, size: 12, color: "#66ccff" },
-    { emoji: "🦈", min: 5000, max: 10000, speed: 0.6, size: 16, color: "#ff9966" },
-    { emoji: "🐋", min: 10000, max: 100000, speed: 1.0, size: 24, color: "#ff66cc" },
+    { emoji: "🐛", min: 100, max: 1000, speed: 0.2, size: 8, color: "#66ff66" }, // Solucan
+    { emoji: "🐟", min: 1000, max: 5000, speed: 0.4, size: 12, color: "#66ccff" }, // Balık
+    { emoji: "🦈", min: 5000, max: 10000, speed: 0.6, size: 16, color: "#ff9966" }, // Yunus
+    { emoji: "🐋", min: 10000, max: 100000, speed: 1.0, size: 24, color: "#ff66cc" }, // Balina
 ];
 
 const memecoinNames = ["DOGEFUN", "SHIBKING", "PEPEMOON", "WIFHAT", "FLOKIROCKET"];
@@ -350,15 +350,45 @@ function moveDots() {
         const dx = player.x - dot.x;
         const dy = player.y - dot.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 100) {
-            const pullSpeed = 2;
-            dot.x += (dx / dist) * pullSpeed;
-            dot.y += (dy / dist) * pullSpeed;
-        } else {
-            dot.angle += (Math.random() - 0.5) * 0.3;
-            dot.x += Math.cos(dot.angle) * dot.type.speed;
-            dot.y += Math.sin(dot.angle) * dot.type.speed;
+        const pullSpeed = 2;
+
+        // Solucanlar (🐛) için: Market cap 100K altındaysa bize doğru gelir
+        if (dot.type.emoji === "🐛" && player.marketcap < 100000) {
+            if (dist < 500) { // 500 birim mesafeden çekim başlar
+                dot.x += (dx / dist) * pullSpeed;
+                dot.y += (dy / dist) * pullSpeed;
+            }
         }
+        // Balıklar (🐟) için: Market cap 200K üstündeyse bize doğru gelir
+        else if (dot.type.emoji === "🐟" && player.marketcap >= 200000) {
+            if (dist < 500) {
+                dot.x += (dx / dist) * pullSpeed;
+                dot.y += (dy / dist) * pullSpeed;
+            }
+        }
+        // Balina (🐋) ve Yunus (🦈) için: Market cap 500K altındaysa bizden kaçar
+        else if ((dot.type.emoji === "🐋" || dot.type.emoji === "🦈") && player.marketcap < 500000) {
+            if (dist < 500) {
+                dot.x -= (dx / dist) * dot.type.speed * 2; // Bizden kaçar
+                dot.y -= (dy / dist) * dot.type.speed * 2;
+            } else {
+                dot.angle += (Math.random() - 0.5) * 0.3;
+                dot.x += Math.cos(dot.angle) * dot.type.speed;
+                dot.y += Math.sin(dot.angle) * dot.type.speed;
+            }
+        }
+        // Normal hareket (rastgele dönme)
+        else {
+            if (dist < 100) {
+                dot.x += (dx / dist) * pullSpeed;
+                dot.y += (dy / dist) * pullSpeed;
+            } else {
+                dot.angle += (Math.random() - 0.5) * 0.3;
+                dot.x += Math.cos(dot.angle) * dot.type.speed;
+                dot.y += Math.sin(dot.angle) * dot.type.speed;
+            }
+        }
+
         if (dot.x < 0 || dot.x > mapWidth) dot.angle = Math.PI - dot.angle;
         if (dot.y < 0 || dot.y > mapHeight) dot.angle = -dot.angle;
     }
@@ -389,7 +419,7 @@ function moveJeets() {
                     gameStarted = false;
                     showGameOver();
                 }
-                createExplosion(jeet.x, jeet.y, jeet.radius);
+                create explosion(jeet.x, jeet.y, jeet.radius);
                 const edgeAngles = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
                 jeet.angle = edgeAngles[Math.floor(Math.random() * edgeAngles.length)];
             }
@@ -534,9 +564,9 @@ function drawBusinesses(viewX, viewY, viewWidth, viewHeight) {
 }
 
 function generateRandomAddress() {
-    const chars = "0123456789abcdef";
-    let address = "0x";
-    for (let i = 0; i < 8; i++) {
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let address = "";
+    for (let i = 0; i < 6; i++) {
         address += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return address;
@@ -567,8 +597,8 @@ function checkCollisions() {
             player.holders.push({ address: holderAddress, percentage: parseFloat(percentage) });
 
             player.holders.sort((a, b) => b.percentage - a.percentage);
-            if (player.holders.length > 5) {
-                player.holders = player.holders.slice(0, 5);
+            if (player.holders.length > 20) {
+                player.holders = player.holders.slice(0, 20);
             }
 
             normalizeHolderPercentages();
@@ -754,6 +784,7 @@ function drawPlayer(p, worldMouseX, worldMouseY) {
     ctx.fillText(p.name, p.x + shakeOffset, p.y - p.radius - 15 + shakeOffset);
     ctx.font = "12px Arial";
     ctx.fillText(`$${formatMarketCap(p.marketcap)}`, p.x + shakeOffset, p.y + p.radius + 20 + shakeOffset);
+    ctx.fillText(`Holders: ${player.holders.length}`, p.x + shakeOffset, p.y + p.radius + 35 + shakeOffset); // Holders sayısını göster
 }
 
 function drawOtherPlayers(viewX, viewY, viewWidth, viewHeight) {
