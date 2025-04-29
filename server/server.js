@@ -7,9 +7,9 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
-app.use(express.static(path.join(__dirname, '../client')));
+app.use(express.static(path.join(__dirname, 'client')));
 
 const mapWidth = 10000;
 const mapHeight = 10000;
@@ -100,108 +100,4 @@ let businesses = [
 ];
 
 function moveDots() {
-    for (let dot of dots) {
-        dot.angle += (Math.random() - 0.5) * 0.3;
-        dot.x += Math.cos(dot.angle) * dot.type.speed;
-        dot.y += Math.sin(dot.angle) * dot.type.speed;
-
-        if (dot.x < 0 || dot.x > mapWidth) dot.angle = Math.PI - dot.angle;
-        if (dot.y < 0 || dot.y > mapHeight) dot.angle = -dot.angle;
-    }
-}
-
-function moveJeets() {
-    for (let i = 0; i < jeets.length; i++) {
-        let jeet = jeets[i];
-        let jeetSpeed = jeet.speed;
-
-        if (jeet.flame && jeet.flameTimer > 0) {
-            jeetSpeed *= 5;
-            jeet.flameTimer--;
-            jeet.opacity -= 1 / 120;
-            jeet.x += Math.cos(jeet.angle) * jeetSpeed;
-            jeet.y += Math.sin(jeet.angle) * jeetSpeed;
-
-            if (jeet.flameTimer <= 0 || jeet.x < 0 || jeet.x > mapWidth || jeet.y < 0 || jeet.y > mapHeight) {
-                jeets.splice(i, 1);
-                jeets.push(spawnNewJeet());
-                i--;
-            }
-        } else {
-            jeet.angle += (Math.random() - 0.5) * 0.3;
-            jeet.x += Math.cos(jeet.angle) * jeetSpeed;
-            jeet.y += Math.sin(jeet.angle) * jeetSpeed;
-            if (jeet.x < 0 || jeet.x > mapWidth) jeet.angle = Math.PI - jeet.angle;
-            if (jeet.y < 0 || jeet.y > mapHeight) jeet.angle = -jeet.angle;
-        }
-
-        if (jeet.shakeTimer > 0) jeet.shakeTimer--;
-    }
-}
-
-setInterval(() => {
-    moveDots();
-    moveJeets();
-    io.emit('update-game-state', { dots, jeets, rugs, businesses });
-}, 1000 / 60);
-
-io.on('connection', (socket) => {
-    console.log('Bir oyuncu bağlandı:', socket.id);
-
-    socket.emit('init-game-state', { dots, jeets, rugs, businesses });
-    socket.emit('init-players', players);
-
-    socket.on('update-player', (playerData) => {
-        playerData.id = socket.id;
-        const existingPlayer = players.find(p => p.id === socket.id);
-        if (existingPlayer) {
-            Object.assign(existingPlayer, playerData);
-        } else {
-            players.push(playerData);
-        }
-        io.emit('update-players', players);
-    });
-
-    socket.on('dot-collected', (dotIndex) => {
-        dots.splice(dotIndex, 1);
-        io.emit('update-game-state', { dots, jeets, rugs, businesses });
-    });
-
-    socket.on('jeet-attached', (jeetIndex) => {
-        const jeet = jeets[jeetIndex];
-        jeet.attached = true;
-        jeet.orbitAngle = Math.random() * Math.PI * 2;
-        const attachDurations = [180, 300, 420, 600, 780];
-        jeet.attachTimer = attachDurations[Math.floor(Math.random() * attachDurations.length)];
-        io.emit('update-game-state', { dots, jeets, rugs, businesses });
-    });
-
-    socket.on('rug-collided', (rugIndex) => {
-        rugs[rugIndex].active = false;
-        setTimeout(() => {
-            rugs[rugIndex].active = true;
-            io.emit('update-game-state', { dots, jeets, rugs, businesses });
-        }, 30000);
-        io.emit('update-game-state', { dots, jeets, rugs, businesses });
-    });
-
-    socket.on('player-died', (playerId) => {
-        players = players.filter(p => p.id !== playerId);
-        io.emit('update-players', players);
-    });
-
-    socket.on('player-rugged', (playerId) => {
-        players = players.filter(p => p.id !== playerId);
-        io.emit('update-players', players);
-    });
-
-    socket.on('disconnect', () => {
-        console.log('Oyuncu ayrıldı:', socket.id);
-        players = players.filter(p => p.id !== socket.id);
-        io.emit('update-players', players);
-    });
-});
-
-server.listen(PORT, () => {
-    console.log(`Sunucu http://localhost:${PORT} adresinde çalışıyor`);
-});
+    for (
