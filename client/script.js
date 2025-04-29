@@ -1075,7 +1075,7 @@ function gameLoop() {
             speed: player.speed
         });
 
-        requestAnimationFrame(gameLoop Towards);
+        requestAnimationFrame(gameLoop);
     } catch (error) {
         console.error("Error in game loop:", error);
     }
