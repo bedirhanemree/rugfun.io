@@ -11,8 +11,8 @@ const socket = io();
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-const mapWidth = 10000; // MAP KÜÇÜLTELECEK: 15000 yerine 1000
-const mapHeight = 10000; // MAP KÜÇÜLTELECEK: 15000 yerine 1000
+const mapWidth = 10000;
+const mapHeight = 10000;
 
 let gameStarted = false;
 let gameOver = false;
@@ -25,7 +25,7 @@ let player = {
     name: "RUGFUN",
     marketcap: 1000,
     color: "#33ff33",
-    speed: 2, // Başlangıç hızı
+    speed: 2,
     image: null,
     zoom: 1,
     stamina: 100,
@@ -59,7 +59,7 @@ const memecoinEmojis = ["🐶", "🐕", "🐸", "🧢", "🚀"];
 const dots = [];
 const trail = [];
 
-for (let i = 0; i < 1000; i++) { // 20000 yerine 1000 (harita küçüldüğü için orantılı olarak azalttık)
+for (let i = 0; i < 1000; i++) {
     const rand = Math.random();
     let type;
     if (rand < 0.6) type = foodTypes[0];
@@ -83,7 +83,7 @@ const jeetAngryImage = new Image();
 jeetAngryImage.src = "jeet_angry.png";
 
 let jeets = [];
-for (let i = 0; i < 20; i++) { // 100 yerine 20 (harita küçüldüğü için orantılı olarak azalttık)
+for (let i = 0; i < 20; i++) {
     const wallet = Math.floor(Math.random() * (1000000 - 100000)) + 100000;
     jeets.push({
         x: Math.random() * mapWidth,
@@ -93,7 +93,7 @@ for (let i = 0; i < 20; i++) { // 100 yerine 20 (harita küçüldüğü için or
         angle: Math.random() * Math.PI * 2,
         image: jeetImage,
         angry: false,
-        angryTimer: 0, // Kovalama süresi için timer
+        angryTimer: 0,
         wallet: wallet,
         flame: false,
         flameTimer: 0,
@@ -115,7 +115,7 @@ function spawnNewJeet() {
         angle: Math.random() * Math.PI * 2,
         image: jeetImage,
         angry: false,
-        angryTimer: 0, // Kovalama süresi için timer
+        angryTimer: 0,
         wallet: wallet,
         flame: false,
         flameTimer: 0,
@@ -129,7 +129,7 @@ function spawnNewJeet() {
 
 // RUG tuzakları
 const rugs = [];
-for (let i = 0; i < 5; i++) { // 50 yerine 5 (harita küçüldüğü için orantılı olarak azalttık)
+for (let i = 0; i < 5; i++) {
     rugs.push({
         x: Math.random() * mapWidth,
         y: Math.random() * mapHeight,
@@ -138,7 +138,7 @@ for (let i = 0; i < 5; i++) { // 50 yerine 5 (harita küçüldüğü için orant
     });
 }
 
-// İşletmeler (İŞLETMELERDEN KAZANILABİLECEK)
+// İşletmeler
 let businesses = [
     { x: 200, y: 200, radius: 20, color: 'green', income: 50 },
     { x: 800, y: 800, radius: 20, color: 'green', income: 50 }
@@ -158,7 +158,7 @@ startButton.disabled = true;
 
 socket.on('connect', () => {
     console.log("Socket.io connected, ID:", socket.id);
-    startButton.disabled = false; // Bağlantı tamamlandığında butonu aktif et
+    startButton.disabled = false;
 });
 
 socket.on('connect_error', (error) => {
@@ -279,7 +279,7 @@ function drawParticles() {
 function updateRadius(entity) {
     const baseRadius = 20;
     const divisor = 1000000;
-    const multiplier = 30;
+    const multiplier = 60; // Değişiklik: 30 yerine 60, daha hızlı kütlesel büyüme
     entity.radius = baseRadius + (entity.marketcap || entity.wallet) / divisor * multiplier;
     entity.radius = Math.max(20, Math.min(100, entity.radius));
     console.log(`Updated radius for ${entity.name || 'JEET'}: ${entity.radius}, Marketcap/Wallet: ${entity.marketcap || entity.wallet}`);
@@ -356,7 +356,7 @@ function moveJeets() {
         } else if (dist < 2000 && player.marketcap >= jeet.wallet) {
             if (!jeet.angry) {
                 jeet.angry = true;
-                jeet.angryTimer = 300; // 5 saniye (60 FPS'de 300 frame)
+                jeet.angryTimer = 900; // Değişiklik: 300 yerine 900 (15 saniye)
             }
             if (jeet.angry) {
                 jeet.image = jeetAngryImage;
@@ -364,7 +364,7 @@ function moveJeets() {
                 jeet.angle = Math.atan2(dy, dx);
                 jeet.angryTimer--;
                 if (jeet.angryTimer <= 0) {
-                    jeet.angry = false; // 5 saniye sonra kovalamayı bırak
+                    jeet.angry = false;
                     jeet.image = jeetImage;
                 }
             }
@@ -414,7 +414,7 @@ function drawDots(viewX, viewY, viewWidth, viewHeight) {
     }
 }
 
-function drawJeets(viewX, viewY, viewWidth, viewHeight) {
+function draw�ets(viewX, viewY, viewWidth, viewHeight) {
     ctx.font = "12px Arial";
     ctx.textAlign = "center";
     for (let jeet of jeets) {
@@ -478,9 +478,9 @@ function checkCollisions() {
         const dx = player.x - dots[i].x;
         const dy = player.y - dots[i].y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < player.radius + dots[i].type.size) {
+        if (distunofficial&& dist < player.radius + dots[i].type.size) {
             player.marketcap += dots[i].wallet;
-            player.speed += 0.05; // Yem yedikçe hız artar
+            player.speed += 0.05;
             updateRadius(player);
             dots.splice(i, 1);
         }
@@ -530,7 +530,7 @@ function checkBusinessCollisions() {
         const dist = Math.sqrt(dx * dx + dy * dy);
 
         if (dist < player.radius + business.radius) {
-            player.marketcap += business.income; // İşletmeden gelir
+            player.marketcap += business.income;
             updateRadius(player);
 
             socket.emit('update-player', {
@@ -559,14 +559,11 @@ function checkPlayerCollisions() {
 
         if (dist < player.radius + otherPlayer.radius) {
             if (player.radius > otherPlayer.radius) {
-                // Büyük oyuncu, küçük oyuncunun tüm marketcap'ini alır
                 player.marketcap += otherPlayer.marketcap;
                 updateRadius(player);
 
-                // Küçük oyuncuyu kaldır (rug pull)
                 socket.emit('player-rugged', otherPlayer.id);
 
-                // Kendi bilgilerini güncelle
                 socket.emit('update-player', {
                     id: player.id,
                     x: player.x,
@@ -632,7 +629,7 @@ function drawPlayer(p) {
 
 function drawOtherPlayers(viewX, viewY, viewWidth, viewHeight) {
     for (let p of players) {
-        if (p.id === player.id) continue; // Kendi oyuncumuzu çizme
+        if (p.id === player.id) continue;
         if (p.x > viewX - 100 && p.x < viewX + viewWidth + 100 && p.y > viewY - 100 && p.y < viewY + viewHeight + 100) {
             if (p.image) {
                 const img = new Image();
@@ -746,7 +743,7 @@ function restartGame(e) {
         gameOver = false;
         gameStarted = true;
         player.marketcap = 1000;
-        player.speed = 2; // Hızı sıfırla
+        player.speed = 2;
         player.x = mapWidth / 2;
         player.y = mapHeight / 2;
         player.stamina = 100;
@@ -803,7 +800,7 @@ function gameLoop() {
         drawBackground(viewX, viewY, viewWidth, viewHeight);
 
         const angle = Math.atan2(target.y - canvas.height / 2, target.x - canvas.width / 2);
-        const moveSpeed = boostActive ? player.speed * 3 : player.speed;
+        const moveSpeed = boostActive ? player.speed * 2 : player.speed; // Değişiklik: *3 yerine *2
         player.x += Math.cos(angle) * moveSpeed * 0.5;
         player.y += Math.sin(angle) * moveSpeed * 0.5;
         player.x = Math.max(player.radius, Math.min(mapWidth - player.radius, player.x));
@@ -857,7 +854,6 @@ function gameLoop() {
         drawLeaderboard();
         drawStaminaBar();
 
-        // Oyuncunun güncel verilerini sunucuya gönder
         socket.emit('update-player', {
             id: player.id,
             x: player.x,
