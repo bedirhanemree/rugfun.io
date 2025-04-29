@@ -26,7 +26,7 @@ let player = {
     marketcap: 1000,
     color: "#33ff33",
     speed: 2,
-    maxSpeed: 3, // Hızı azalttık (5'ten 3'e)
+    maxSpeed: 3,
     image: null,
     zoom: 1,
     stamina: 100,
@@ -184,30 +184,40 @@ let businesses = [
 ];
 
 socket.on('init-players', (serverPlayers) => {
-    players = serverPlayers;
+    players = serverPlayers.map(p => ({
+        ...p,
+        image: p.image ? new Image() : null
+    }));
     players.forEach(p => {
+        if (p.image && p.image.src !== p.image) {
+            p.image.src = p.image;
+        }
         if (!p.slimePoints) {
-            p.slimePoints = [];
             initializeSlimePoints(p);
         }
         if (!p.slimeDeform) {
             p.slimeDeform = 0;
         }
     });
+    console.log("Initialized players:", players);
 });
 
 socket.on('update-players', (serverPlayers) => {
-    players = serverPlayers;
+    players = serverPlayers.map(p => ({
+        ...p,
+        image: p.image ? new Image() : null
+    }));
     players.forEach(p => {
+        if (p.image && p.image.src !== p.image) {
+            p.image.src = p.image;
+        }
         if (!p.slimePoints) {
-            p.slimePoints = [];
             initializeSlimePoints(p);
         }
         if (!p.slimeDeform) {
             p.slimeDeform = 0;
         }
     });
-    // Players listesini kontrol et
     console.log("Updated players:", players);
 });
 
@@ -565,12 +575,10 @@ function drawBackground(viewX, viewY, viewWidth, viewHeight) {
     ctx.fillStyle = "#1a1a1a";
     ctx.fillRect(viewX, viewY, viewWidth, viewHeight);
 
-    // Harita sınırlarını yeşil renkte çiz
-    ctx.strokeStyle = "lime"; // Yeşil renk
-    ctx.lineWidth = 5; // Çizgi kalınlığı
+    ctx.strokeStyle = "lime";
+    ctx.lineWidth = 5;
     ctx.strokeRect(0, 0, mapWidth, mapHeight);
 
-    // Arka plan ızgara çizgileri
     ctx.strokeStyle = "#333";
     ctx.lineWidth = 1;
     for (let x = Math.floor(viewX / 200) * 200; x <= viewX + viewWidth; x += 200) {
@@ -684,7 +692,7 @@ function checkCollisions() {
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < player.radius + dots[i].type.size) {
             player.marketcap += dots[i].wallet;
-            player.speed = Math.min(player.speed + 0.01, player.maxSpeed); // Hız artışını azalttık (0.05'ten 0.01'e)
+            player.speed = Math.min(player.speed + 0.01, player.maxSpeed);
             updateRadius(player);
 
             const holderAddress = generateRandomAddress();
@@ -767,7 +775,11 @@ function checkBusinessCollisions() {
                 image: player.image ? player.image.src : null,
                 radius: player.radius,
                 color: player.color,
-                speed: player.speed
+                speed: player.speed,
+                allHolders: player.allHolders,
+                slimePoints: player.slimePoints,
+                slimeDeform: player.slimeDeform,
+                isAlive: player.isAlive
             });
         }
     }
@@ -799,7 +811,11 @@ function checkPlayerCollisions() {
                     image: player.image ? player.image.src : null,
                     radius: player.radius,
                     color: player.color,
-                    speed: player.speed
+                    speed: player.speed,
+                    allHolders: player.allHolders,
+                    slimePoints: player.slimePoints,
+                    slimeDeform: player.slimeDeform,
+                    isAlive: player.isAlive
                 });
             }
         }
@@ -808,7 +824,9 @@ function checkPlayerCollisions() {
 
 function drawPlayer(p, worldMouseX, worldMouseY) {
     if (!p.isAlive) return;
-    const angleToMouse = Math.atan2(worldMouseY - p.y, worldMouseX - p.x);
+
+    const angleToMouse = p.id === player.id ? Math.atan2(worldMouseY - p.y, worldMouseX - p.x) : 0;
+    p.slimeDeform = p.slimeDeform || 0;
     p.slimeDeform += 0.05;
     const numPoints = p.slimePoints.length;
     const spring = 0.1;
@@ -818,7 +836,7 @@ function drawPlayer(p, worldMouseX, worldMouseY) {
         const point = p.slimePoints[i];
         const angle = (i / numPoints) * Math.PI * 2;
         let radiusOffset = Math.sin(p.slimeDeform + angle * 2) * 3;
-        const mouseInfluence = Math.cos(angle - angleToMouse) * 10;
+        const mouseInfluence = p.id === player.id ? Math.cos(angle - angleToMouse) * 10 : 0;
         const targetRadius = p.radius + radiusOffset + mouseInfluence;
         point.targetX = p.x + Math.cos(angle) * targetRadius;
         point.targetY = p.y + Math.sin(angle) * targetRadius;
@@ -850,8 +868,8 @@ function drawPlayer(p, worldMouseX, worldMouseY) {
     ctx.shadowBlur = 15;
 
     const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius);
-    gradient.addColorStop(0, "rgba(51, 255, 51, 0.9)");
-    gradient.addColorStop(1, "rgba(0, 153, 0, 0.5)");
+    gradient.addColorStop(0, `rgba(${parseInt(p.color.slice(1, 3), 16)}, ${parseInt(p.color.slice(3, 5), 16)}, ${parseInt(p.color.slice(5, 7), 16)}, 0.9)`);
+    gradient.addColorStop(1, `rgba(${parseInt(p.color.slice(1, 3), 16)}, ${parseInt(p.color.slice(3, 5), 16)}, ${parseInt(p.color.slice(5, 7), 16)}, 0.5)`);
     ctx.fillStyle = gradient;
     ctx.fill();
 
@@ -877,13 +895,13 @@ function drawPlayer(p, worldMouseX, worldMouseY) {
 }
 
 function drawOtherPlayers(viewX, viewY, viewWidth, viewHeight) {
-    // Görünürlük kontrolünü sadeleştir
     for (let p of players) {
-        if (p.id === player.id) continue;
-        // Oyuncunun görünür olup olmadığını kontrol et
-        if (p.x > viewX - 100 && p.x < viewX + viewWidth + 100 && p.y > viewY - 100 && p.y < viewY + viewHeight + 100) {
+        if (p.id === player.id || !p.isAlive) continue;
+        if (p.x > viewX - p.radius && p.x < viewX + viewWidth + p.radius && p.y > viewY - p.radius && p.y < viewY + viewHeight + p.radius) {
+            console.log(`Drawing other player: ${p.name} at (${p.x}, ${p.y}) with marketcap ${p.marketcap}`);
             drawPlayer(p, p.x, p.y);
-            console.log("Drawing other player:", p); // Hata ayıklama için
+        } else {
+            console.log(`Player ${p.name} is out of view at (${p.x}, ${p.y})`);
         }
     }
 }
@@ -1008,7 +1026,7 @@ function gameLoop() {
 
         if (player.isAlive) {
             const angle = Math.atan2(target.y - canvas.height / 2, target.x - canvas.width / 2);
-            const moveSpeed = boostActive ? player.speed * 2 : player.speed; // Boost etkisini azalttık (3'ten 2'ye)
+            const moveSpeed = boostActive ? player.speed * 2 : player.speed;
             player.x += Math.cos(angle) * moveSpeed * 0.5;
             player.y += Math.sin(angle) * moveSpeed * 0.5;
             player.x = Math.max(player.radius, Math.min(mapWidth - player.radius, player.x));
@@ -1072,7 +1090,11 @@ function gameLoop() {
             image: player.image ? player.image.src : null,
             radius: player.radius,
             color: player.color,
-            speed: player.speed
+            speed: player.speed,
+            allHolders: player.allHolders,
+            slimePoints: player.slimePoints,
+            slimeDeform: player.slimeDeform,
+            isAlive: player.isAlive
         });
 
         requestAnimationFrame(gameLoop);
