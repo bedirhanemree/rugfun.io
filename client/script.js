@@ -569,7 +569,7 @@ function drawDots(viewX, viewY, viewWidth, viewHeight) {
 
 function drawJeets(viewX, viewY, viewWidth, viewHeight) {
     ctx.font = "12px Arial";
-    ctx textAlign = "center";
+    ctx.textAlign = "center";
     for (let jeet of jeets) {
         if (jeet.x > viewX - 100 && jeet.x < viewX + viewWidth + 100 && jeet.y > viewY - 100 && jeet.y < viewY + viewHeight + 100) {
             ctx.save();
