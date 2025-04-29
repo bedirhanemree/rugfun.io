@@ -4,6 +4,8 @@ const coinImageInput = document.getElementById("coinImage");
 const startButton = document.getElementById("startButton");
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
+const failedText = document.getElementById("failedText");
+const restartText = document.getElementById("restartText");
 
 // Socket.io bağlantısını kur
 const socket = io();
@@ -352,33 +354,26 @@ function moveDots() {
         const dist = Math.sqrt(dx * dx + dy * dy);
         const pullSpeed = 2;
 
-        // Solucanlar (🐛) için: Market cap 100K altındaysa bize doğru gelir
         if (dot.type.emoji === "🐛" && player.marketcap < 100000) {
-            if (dist < 500) { // 500 birim mesafeden çekim başlar
-                dot.x += (dx / dist) * pullSpeed;
-                dot.y += (dy / dist) * pullSpeed;
-            }
-        }
-        // Balıklar (🐟) için: Market cap 200K üstündeyse bize doğru gelir
-        else if (dot.type.emoji === "🐟" && player.marketcap >= 200000) {
             if (dist < 500) {
                 dot.x += (dx / dist) * pullSpeed;
                 dot.y += (dy / dist) * pullSpeed;
             }
-        }
-        // Balina (🐋) ve Yunus (🦈) için: Market cap 500K altındaysa bizden kaçar
-        else if ((dot.type.emoji === "🐋" || dot.type.emoji === "🦈") && player.marketcap < 500000) {
+        } else if (dot.type.emoji === "🐟" && player.marketcap >= 200000) {
             if (dist < 500) {
-                dot.x -= (dx / dist) * dot.type.speed * 2; // Bizden kaçar
+                dot.x += (dx / dist) * pullSpeed;
+                dot.y += (dy / dist) * pullSpeed;
+            }
+        } else if ((dot.type.emoji === "🐋" || dot.type.emoji === "🦈") && player.marketcap < 500000) {
+            if (dist < 500) {
+                dot.x -= (dx / dist) * dot.type.speed * 2;
                 dot.y -= (dy / dist) * dot.type.speed * 2;
             } else {
                 dot.angle += (Math.random() - 0.5) * 0.3;
                 dot.x += Math.cos(dot.angle) * dot.type.speed;
                 dot.y += Math.sin(dot.angle) * dot.type.speed;
             }
-        }
-        // Normal hareket (rastgele dönme)
-        else {
+        } else {
             if (dist < 100) {
                 dot.x += (dx / dist) * pullSpeed;
                 dot.y += (dy / dist) * pullSpeed;
@@ -413,12 +408,14 @@ function moveJeets() {
                 player.shakeTimer = 30;
                 const stolenAmount = jeet.wallet;
                 player.marketcap -= stolenAmount;
-                updateRadius(player);
-                if (player.marketcap < 0) {
+                // Market cap sıfırdan küçük olmamalı
+                if (player.marketcap <= 0) {
+                    player.marketcap = 0;
                     gameOver = true;
                     gameStarted = false;
                     showGameOver();
                 }
+                updateRadius(player);
                 createExplosion(jeet.x, jeet.y, jeet.radius);
                 const edgeAngles = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
                 jeet.angle = edgeAngles[Math.floor(Math.random() * edgeAngles.length)];
@@ -596,6 +593,7 @@ function checkCollisions() {
             const percentage = (Math.random() * 4.9 + 0.1).toFixed(2);
             player.holders.push({ address: holderAddress, percentage: parseFloat(percentage) });
 
+            // Top 20 Holders için sıralama ve sınır
             player.holders.sort((a, b) => b.percentage - a.percentage);
             if (player.holders.length > 20) {
                 player.holders = player.holders.slice(0, 20);
@@ -632,12 +630,14 @@ function checkRugCollisions() {
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < player.radius + rug.radius) {
             player.marketcap *= 0.5;
-            updateRadius(player);
-            if (player.marketcap < 0) {
+            // Market cap sıfırdan küçük olmamalı
+            if (player.marketcap <= 0) {
+                player.marketcap = 0;
                 gameOver = true;
                 gameStarted = false;
                 showGameOver();
             }
+            updateRadius(player);
             rug.active = false;
             setTimeout(() => (rug.active = true), 30000);
         }
@@ -784,7 +784,7 @@ function drawPlayer(p, worldMouseX, worldMouseY) {
     ctx.fillText(p.name, p.x + shakeOffset, p.y - p.radius - 15 + shakeOffset);
     ctx.font = "12px Arial";
     ctx.fillText(`$${formatMarketCap(p.marketcap)}`, p.x + shakeOffset, p.y + p.radius + 20 + shakeOffset);
-    ctx.fillText(`Holders: ${player.holders.length}`, p.x + shakeOffset, p.y + p.radius + 35 + shakeOffset); // Holders sayısını göster
+    ctx.fillText(`Holders: ${player.holders.length}`, p.x + shakeOffset, p.y + p.radius + 35 + shakeOffset);
 }
 
 function drawOtherPlayers(viewX, viewY, viewWidth, viewHeight) {
@@ -913,17 +913,18 @@ function drawTrail() {
 }
 
 function showGameOver() {
-    ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "red";
-    ctx.font = "50px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 50);
-    ctx.fillStyle = "white";
-    ctx.font = "30px Arial";
-    ctx.fillText("Your Market Cap Dropped Below Zero!", canvas.width / 2, canvas.height / 2);
-    ctx.fillText("Press R to Restart", canvas.width / 2, canvas.height / 2 + 50);
+    // Kırmızı yanıp sönme efektini başlat
+    canvas.classList.add("flash-red");
 
+    // FAILED yazısını göster (fade-in ve fade-out)
+    failedText.style.animation = "fadeInOut 3s forwards";
+
+    // 3 saniye sonra "Press 'R' to restart" yazısını göster
+    setTimeout(() => {
+        restartText.style.opacity = 1;
+    }, 3000);
+
+    // R tuşuna basıldığında oyunu yeniden başlat
     window.addEventListener("keydown", restartGame);
 }
 
@@ -962,6 +963,11 @@ function restartGame(e) {
                 opacity: 1,
             });
         }
+        // Efektleri sıfırla
+        canvas.classList.remove("flash-red");
+        failedText.style.animation = "none";
+        failedText.style.opacity = 0;
+        restartText.style.opacity = 0;
         window.removeEventListener("keydown", restartGame);
         requestAnimationFrame(gameLoop);
     }
