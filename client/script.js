@@ -65,7 +65,7 @@ function updateRadius(entity) {
     const multiplier = 60;
     entity.radius = baseRadius + (entity.marketcap || entity.wallet) / divisor * multiplier;
     entity.radius = Math.max(20, Math.min(100, entity.radius));
-    initializeSlimePoints(entity);
+    initializeSlimePoints(entity); // Her radius güncellemesinde slimePoints'i yeniden başlat
 }
 
 updateRadius(player);
@@ -88,25 +88,30 @@ const foodTypes = [
 const memecoinNames = ["DOGEFUN", "SHIBKING", "PEPEMOON", "WIFHAT", "FLOKIROCKET"];
 const memecoinEmojis = ["🐶", "🐕", "🐸", "🧢", "🚀"];
 
-const dots = [];
-const trail = [];
+let dots = [];
+let trail = [];
 
-for (let i = 0; i < 1000; i++) {
-    const rand = Math.random();
-    let type;
-    if (rand < 0.6) type = foodTypes[0];
-    else if (rand < 0.85) type = foodTypes[1];
-    else if (rand < 0.97) type = foodTypes[2];
-    else type = foodTypes[3];
+function initializeDots() {
+    dots = [];
+    for (let i = 0; i < 1000; i++) {
+        const rand = Math.random();
+        let type;
+        if (rand < 0.6) type = foodTypes[0];
+        else if (rand < 0.85) type = foodTypes[1];
+        else if (rand < 0.97) type = foodTypes[2];
+        else type = foodTypes[3];
 
-    dots.push({
-        x: Math.random() * mapWidth,
-        y: Math.random() * mapHeight,
-        type,
-        wallet: Math.floor(Math.random() * (type.max - type.min)) + type.min,
-        angle: Math.random() * Math.PI * 2,
-    });
+        dots.push({
+            x: Math.random() * mapWidth,
+            y: Math.random() * mapHeight,
+            type,
+            wallet: Math.floor(Math.random() * (type.max - type.min)) + type.min,
+            angle: Math.random() * Math.PI * 2,
+        });
+    }
 }
+
+initializeDots();
 
 const jeetImage = new Image();
 jeetImage.src = "jeet.png";
@@ -114,27 +119,32 @@ const jeetAngryImage = new Image();
 jeetAngryImage.src = "jeet_angry.png";
 
 let jeets = [];
-for (let i = 0; i < 20; i++) {
-    const wallet = Math.floor(Math.random() * (1000000 - 100000)) + 100000;
-    jeets.push({
-        x: Math.random() * mapWidth,
-        y: Math.random() * mapHeight,
-        radius: 20 + (wallet / 1000000) * 30,
-        speed: 1,
-        angle: Math.random() * Math.PI * 2,
-        image: jeetImage,
-        angry: false,
-        angryTimer: 0,
-        wallet: wallet,
-        flame: false,
-        flameTimer: 0,
-        shakeTimer: 0,
-        attached: false,
-        attachTimer: 0,
-        orbitAngle: 0,
-        opacity: 1,
-    });
+function initializeJeets() {
+    jeets = [];
+    for (let i = 0; i < 20; i++) {
+        const wallet = Math.floor(Math.random() * (1000000 - 100000)) + 100000;
+        jeets.push({
+            x: Math.random() * mapWidth,
+            y: Math.random() * mapHeight,
+            radius: 20 + (wallet / 1000000) * 30,
+            speed: 1,
+            angle: Math.random() * Math.PI * 2,
+            image: jeetImage,
+            angry: false,
+            angryTimer: 0,
+            wallet: wallet,
+            flame: false,
+            flameTimer: 0,
+            shakeTimer: 0,
+            attached: false,
+            attachTimer: 0,
+            orbitAngle: 0,
+            opacity: 1,
+        });
+    }
 }
+
+initializeJeets();
 
 function spawnNewJeet() {
     const wallet = Math.floor(Math.random() * (1000000 - 100000)) + 100000;
@@ -175,7 +185,6 @@ let businesses = [
 
 socket.on('init-players', (serverPlayers) => {
     players = serverPlayers;
-    // Her oyuncuya slimePoints ve slimeDeform ekle
     players.forEach(p => {
         if (!p.slimePoints) {
             p.slimePoints = [];
@@ -189,7 +198,6 @@ socket.on('init-players', (serverPlayers) => {
 
 socket.on('update-players', (serverPlayers) => {
     players = serverPlayers;
-    // Her oyuncuya slimePoints ve slimeDeform ekle
     players.forEach(p => {
         if (!p.slimePoints) {
             p.slimePoints = [];
@@ -251,9 +259,8 @@ if (!startButton) {
 
 function startGame() {
     if (!startScreen) return;
-    startScreen.style.display = "none";
-    leaderboard.style.display = "block";
-    coinInfo.style.display = "block";
+
+    // Tüm oyun durumlarını sıfırla
     player.id = socket.id || "temp-" + Math.random().toString(36).substr(2, 9);
     player.isAlive = true;
     player.marketcap = 1000;
@@ -261,11 +268,31 @@ function startGame() {
     player.x = mapWidth / 2;
     player.y = mapHeight / 2;
     player.stamina = 100;
+    player.maxStamina = 100;
     player.boostCooldown = false;
     player.allHolders = [];
     player.holders = [];
     player.hasBonded = false;
+    player.zoom = 1;
+    player.shakeTimer = 0;
+    player.slimeDeform = 0;
     updateRadius(player);
+
+    // Canvas'ı temizle
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // UI elemanlarını güncelle
+    startScreen.style.display = "none";
+    leaderboard.style.display = "block";
+    coinInfo.style.display = "block";
+
+    // Oyun nesnelerini sıfırla
+    initializeDots();
+    initializeJeets();
+    trail = [];
+    particles = [];
+
+    // Oyun döngüsünü başlat
     requestAnimationFrame(gameLoop);
 }
 
@@ -479,7 +506,7 @@ function moveJeets() {
                         startScreen.style.display = "block";
                         leaderboard.style.display = "none";
                         coinInfo.style.display = "none";
-                    }, 2000); // 2 saniye sonra başlangıç ekranını göster
+                    }, 2000);
                 }
                 updateRadius(player);
                 createExplosion(jeet.x, jeet.y, jeet.radius);
@@ -569,7 +596,7 @@ function drawDots(viewX, viewY, viewWidth, viewHeight) {
 
 function drawJeets(viewX, viewY, viewWidth, viewHeight) {
     ctx.font = "12px Arial";
-    ctx.textAlign = "center";
+    ctx.textAlign = "center"; // Düzeltildi: "ctx textAlign" yerine "ctx.textAlign"
     for (let jeet of jeets) {
         if (jeet.x > viewX - 100 && jeet.x < viewX + viewWidth + 100 && jeet.y > viewY - 100 && jeet.y < viewY + viewHeight + 100) {
             ctx.save();
@@ -707,7 +734,7 @@ function checkRugCollisions() {
                     startScreen.style.display = "block";
                     leaderboard.style.display = "none";
                     coinInfo.style.display = "none";
-                }, 2000); // 2 saniye sonra başlangıç ekranını göster
+                }, 2000);
             }
             updateRadius(player);
             rug.active = false;
@@ -778,7 +805,7 @@ function checkPlayerCollisions() {
 function drawPlayer(p, worldMouseX, worldMouseY) {
     if (!p.isAlive) return;
     const angleToMouse = Math.atan2(worldMouseY - p.y, worldMouseX - p.x);
-    p.slimeDeform += 0.1;
+    p.slimeDeform += 0.05; // Deformasyon hızını azalttık (0.1'den 0.05'e)
     const numPoints = p.slimePoints.length;
     const spring = 0.1;
     const friction = 0.85;
@@ -786,10 +813,9 @@ function drawPlayer(p, worldMouseX, worldMouseY) {
     for (let i = 0; i < numPoints; i++) {
         const point = p.slimePoints[i];
         const angle = (i / numPoints) * Math.PI * 2;
-        let radiusOffset = Math.sin(p.slimeDeform + angle * 3) * 5;
-        const mouseInfluence = Math.cos(angle - angleToMouse);
-        radiusOffset += mouseInfluence * 30;
-        const targetRadius = p.radius + radiusOffset;
+        let radiusOffset = Math.sin(p.slimeDeform + angle * 2) * 3; // Deformasyon etkisini azalttık (5'ten 3'e)
+        const mouseInfluence = Math.cos(angle - angleToMouse) * 10; // Fare etkisini azalttık (30'dan 10'a)
+        const targetRadius = p.radius + radiusOffset + mouseInfluence;
         point.targetX = p.x + Math.cos(angle) * targetRadius;
         point.targetY = p.y + Math.sin(angle) * targetRadius;
         const dx = point.targetX - point.x;
@@ -850,8 +876,7 @@ function drawOtherPlayers(viewX, viewY, viewWidth, viewHeight) {
     for (let p of players) {
         if (p.id === player.id) continue;
         if (p.x > viewX - 100 && p.x < viewX + viewWidth + 100 && p.y > viewY - 100 && p.y < viewY + viewHeight + 100) {
-            // Diğer oyuncuları da slime efektiyle çiz
-            drawPlayer(p, p.x, p.y); // worldMouseX ve worldMouseY yerine oyuncunun pozisyonunu kullanıyoruz
+            drawPlayer(p, p.x, p.y);
         }
     }
 }
@@ -946,7 +971,16 @@ function drawTrail() {
 
 function gameLoop() {
     try {
+        // Canvas'ı her zaman temizle
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Oyuncu hayatta değilse, sadece arka planı çiz ve döngüyü devam ettir
+        if (!player.isAlive) {
+            ctx.fillStyle = "#1a1a1a";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            requestAnimationFrame(gameLoop);
+            return;
+        }
 
         let targetZoom = 100 / player.radius;
         targetZoom = Math.max(0.1, Math.min(1, targetZoom));
