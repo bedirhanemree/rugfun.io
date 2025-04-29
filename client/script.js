@@ -17,9 +17,6 @@ canvas.height = window.innerHeight;
 const mapWidth = 10000;
 const mapHeight = 10000;
 
-let gameStarted = false;
-let gameOver = false;
-
 let player = {
     id: Math.random().toString(36).substr(2, 9),
     x: mapWidth / 2,
@@ -41,6 +38,7 @@ let player = {
     allHolders: [],
     holders: [],
     hasBonded: false,
+    isAlive: true, // Oyuncunun hayatta olup olmadığını kontrol eden yeni özellik
 };
 
 function initializeSlimePoints() {
@@ -183,6 +181,12 @@ socket.on('update-players', (serverPlayers) => {
     players = serverPlayers;
 });
 
+// Oyuncunun öldüğünü diğer oyunculara bildiren olay
+socket.on('player-died', (playerId) => {
+    // Ölen oyuncuyu players listesinden çıkar
+    players = players.filter(p => p.id !== playerId);
+});
+
 if (!startButton) {
     console.error("Start button not found! Check if 'startButton' ID exists in your HTML.");
 } else {
@@ -232,8 +236,8 @@ function startGame() {
     startScreen.style.display = "none";
     leaderboard.style.display = "block";
     coinInfo.style.display = "block";
-    gameStarted = true;
     player.id = socket.id || "temp-" + Math.random().toString(36).substr(2, 9);
+    player.isAlive = true; // Oyuncuyu başlangıçta hayatta yap
     requestAnimationFrame(gameLoop);
 }
 
@@ -243,9 +247,9 @@ window.addEventListener("mousemove", (e) => {
 });
 
 window.addEventListener("keydown", (e) => {
-    if (e.code === "Space" && !player.boostCooldown && player.stamina > 0) {
+    if (e.code === "Space" && !player.boostCooldown && player.stamina > 0 && player.isAlive) {
         boostActive = true;
-        boostTimer = 1200; // Nitro süresini artırdık (900'den 1200'e)
+        boostTimer = 1200;
     }
 });
 
@@ -261,7 +265,7 @@ function createExplosion(x, y, radius) {
         const angle = Math.random() * Math.PI * 2;
         const speed = Math.random() * 5 + 2;
         const size = Math.random() * 5 + 2;
-        const color = `hsl(${Math.random() * 30 + 10}, 100%, 50%)`;
+        const color = "hsl(0, 100%, 50%)"; // Sabit kırmızı renk (kırmızı tonlar)
         particles.push({
             x: x,
             y: y,
@@ -332,12 +336,10 @@ function moveDots() {
         const dy = player.y - dot.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         const pullSpeed = 2;
-        const escapeSpeed = 0.5; // Kaçma hızını azalttık (2'den 0.5'e)
+        const escapeSpeed = 0.5;
 
-        // Market cap'e göre yemlerin davranışını belirle
         if (player.marketcap < 10000) {
-            // Market cap < 10K: Tüm yemler kaçacak
-            if (dist < 300) { // Kaçma mesafesini azalttık (500'den 300'e)
+            if (dist < 300) {
                 dot.x -= (dx / dist) * escapeSpeed;
                 dot.y -= (dy / dist) * escapeSpeed;
             } else {
@@ -346,7 +348,6 @@ function moveDots() {
                 dot.y += Math.sin(dot.angle) * dot.type.speed;
             }
         } else if (player.marketcap >= 10000 && player.marketcap < 75000) {
-            // Market cap ≥ 10K ve < 75K: Solucanlar yaklaşacak, diğerleri kaçacak
             if (dot.type.emoji === "🐛") {
                 if (dist < 300) {
                     dot.x += (dx / dist) * pullSpeed;
@@ -367,7 +368,6 @@ function moveDots() {
                 }
             }
         } else if (player.marketcap >= 75000 && player.marketcap < 150000) {
-            // Market cap ≥ 75K ve < 150K: Solucanlar ve balıklar yaklaşacak, diğerleri kaçacak
             if (dot.type.emoji === "🐛" || dot.type.emoji === "🐟") {
                 if (dist < 300) {
                     dot.x += (dx / dist) * pullSpeed;
@@ -388,7 +388,6 @@ function moveDots() {
                 }
             }
         } else if (player.marketcap >= 150000 && player.marketcap < 500000) {
-            // Market cap ≥ 150K ve < 500K: Solucanlar, balıklar ve yunuslar yaklaşacak, balinalar kaçacak
             if (dot.type.emoji === "🐛" || dot.type.emoji === "🐟" || dot.type.emoji === "🦈") {
                 if (dist < 300) {
                     dot.x += (dx / dist) * pullSpeed;
@@ -409,7 +408,6 @@ function moveDots() {
                 }
             }
         } else if (player.marketcap >= 500000) {
-            // Market cap ≥ 500K: Tüm yemler yaklaşacak
             if (dist < 300) {
                 dot.x += (dx / dist) * pullSpeed;
                 dot.y += (dy / dist) * pullSpeed;
@@ -420,7 +418,6 @@ function moveDots() {
             }
         }
 
-        // Harita sınırları kontrolü
         if (dot.x < 0 || dot.x > mapWidth) dot.angle = Math.PI - dot.angle;
         if (dot.y < 0 || dot.y > mapHeight) dot.angle = -dot.angle;
     }
@@ -447,9 +444,10 @@ function moveJeets() {
                 player.marketcap -= stolenAmount;
                 if (player.marketcap <= 0) {
                     player.marketcap = 0;
-                    gameOver = true;
-                    gameStarted = false;
-                    showGameOver();
+                    player.isAlive = false; // Oyuncuyu öldür
+                    createExplosion(player.x, player.y, player.radius); // Kırmızı partikül patlama efekti
+                    socket.emit('player-died', player.id); // Diğer oyunculara bildir
+                    setTimeout(respawnPlayer, 3000); // 3 saniye sonra oyuncuyu yeniden doğur
                 }
                 updateRadius(player);
                 createExplosion(jeet.x, jeet.y, jeet.radius);
@@ -616,6 +614,7 @@ function normalizeHolderPercentages() {
 }
 
 function checkCollisions() {
+    if (!player.isAlive) return; // Oyuncu ölüyse çarpışma kontrolü yapma
     for (let i = dots.length - 1; i >= 0; i--) {
         const dx = player.x - dots[i].x;
         const dy = player.y - dots[i].y;
@@ -642,6 +641,7 @@ function checkCollisions() {
 }
 
 function checkJeetCollisions() {
+    if (!player.isAlive) return; // Oyuncu ölüyse çarpışma kontrolü yapma
     const attachedJeets = jeets.filter(jeet => jeet.attached).length;
     for (let jeet of jeets) {
         if (jeet.attached || jeet.flame) continue;
@@ -658,6 +658,7 @@ function checkJeetCollisions() {
 }
 
 function checkRugCollisions() {
+    if (!player.isAlive) return; // Oyuncu ölüyse çarpışma kontrolü yapma
     for (let rug of rugs) {
         if (!rug.active) continue;
         const dx = player.x - rug.x;
@@ -667,9 +668,10 @@ function checkRugCollisions() {
             player.marketcap *= 0.5;
             if (player.marketcap <= 0) {
                 player.marketcap = 0;
-                gameOver = true;
-                gameStarted = false;
-                showGameOver();
+                player.isAlive = false; // Oyuncuyu öldür
+                createExplosion(player.x, player.y, player.radius); // Kırmızı partikül patlama efekti
+                socket.emit('player-died', player.id); // Diğer oyunculara bildir
+                setTimeout(respawnPlayer, 3000); // 3 saniye sonra oyuncuyu yeniden doğur
             }
             updateRadius(player);
             rug.active = false;
@@ -679,6 +681,7 @@ function checkRugCollisions() {
 }
 
 function checkBusinessCollisions() {
+    if (!player.isAlive) return; // Oyuncu ölüyse çarpışma kontrolü yapma
     for (let business of businesses) {
         const dx = player.x - business.x;
         const dy = player.y - business.y;
@@ -704,6 +707,7 @@ function checkBusinessCollisions() {
 }
 
 function checkPlayerCollisions() {
+    if (!player.isAlive) return; // Oyuncu ölüyse çarpışma kontrolü yapma
     for (let i = players.length - 1; i >= 0; i--) {
         const otherPlayer = players[i];
         if (otherPlayer.id === player.id) continue;
@@ -735,7 +739,36 @@ function checkPlayerCollisions() {
     }
 }
 
+function respawnPlayer() {
+    // Oyuncuyu yeniden doğur
+    player.isAlive = true;
+    player.marketcap = 1000;
+    player.speed = 2;
+    player.x = mapWidth / 2;
+    player.y = mapHeight / 2;
+    player.stamina = 100;
+    player.boostCooldown = false;
+    player.allHolders = [];
+    player.holders = [];
+    player.hasBonded = false;
+    updateRadius(player);
+
+    // Diğer oyunculara oyuncunun yeniden doğduğunu bildir
+    socket.emit('update-player', {
+        id: player.id,
+        x: player.x,
+        y: player.y,
+        marketcap: player.marketcap,
+        name: player.name,
+        image: player.image ? player.image.src : null,
+        radius: player.radius,
+        color: player.color,
+        speed: player.speed
+    });
+}
+
 function drawPlayer(p, worldMouseX, worldMouseY) {
+    if (!p.isAlive) return; // Oyuncu ölüyse çizme
     const angleToMouse = Math.atan2(worldMouseY - p.y, worldMouseX - p.x);
     p.slimeDeform += 0.1;
     const numPoints = p.slimePoints.length;
@@ -929,63 +962,7 @@ function drawTrail() {
     }
 }
 
-function showGameOver() {
-    canvas.classList.add("flash-red");
-
-    failedText.style.animation = "fadeInOut 3s forwards";
-
-    setTimeout(() => {
-        ctx.fillStyle = "black";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        startScreen.style.display = "block";
-        leaderboard.style.display = "none";
-        coinInfo.style.display = "none";
-        gameOver = false;
-        gameStarted = false;
-
-        player.marketcap = 1000;
-        player.speed = 2;
-        player.x = mapWidth / 2;
-        player.y = mapHeight / 2;
-        player.stamina = 100;
-        player.boostCooldown = false;
-        player.allHolders = [];
-        player.holders = [];
-        player.hasBonded = false;
-        updateRadius(player);
-        jeets = [];
-        for (let i = 0; i < 20; i++) {
-            const wallet = Math.floor(Math.random() * (1000000 - 100000)) + 100000;
-            jeets.push({
-                x: Math.random() * mapWidth,
-                y: Math.random() * mapHeight,
-                radius: 20 + (wallet / 1000000) * 30,
-                speed: 1,
-                angle: Math.random() * Math.PI * 2,
-                image: jeetImage,
-                angry: false,
-                angryTimer: 0,
-                wallet: wallet,
-                flame: false,
-                flameTimer: 0,
-                shakeTimer: 0,
-                attached: false,
-                attachTimer: 0,
-                orbitAngle: 0,
-                opacity: 1,
-            });
-        }
-        canvas.classList.remove("flash-red");
-        failedText.style.animation = "none";
-        failedText.style.opacity = 0;
-        restartText.style.opacity = 0;
-    }, 3000);
-}
-
 function gameLoop() {
-    if (!gameStarted) return;
-
     try {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -1008,36 +985,39 @@ function gameLoop() {
 
         drawBackground(viewX, viewY, viewWidth, viewHeight);
 
-        const angle = Math.atan2(target.y - canvas.height / 2, target.x - canvas.width / 2);
-        const moveSpeed = boostActive ? player.speed * 3 : player.speed; // Nitro hızını artırdık (2'den 3'e)
-        player.x += Math.cos(angle) * moveSpeed * 0.5;
-        player.y += Math.sin(angle) * moveSpeed * 0.5;
-        player.x = Math.max(player.radius, Math.min(mapWidth - player.radius, player.x));
-        player.y = Math.max(player.radius, Math.min(mapHeight - player.radius, player.y));
+        // Oyuncu hayattaysa hareket etsin
+        if (player.isAlive) {
+            const angle = Math.atan2(target.y - canvas.height / 2, target.x - canvas.width / 2);
+            const moveSpeed = boostActive ? player.speed * 3 : player.speed;
+            player.x += Math.cos(angle) * moveSpeed * 0.5;
+            player.y += Math.sin(angle) * moveSpeed * 0.5;
+            player.x = Math.max(player.radius, Math.min(mapWidth - player.radius, player.x));
+            player.y = Math.max(player.radius, Math.min(mapHeight - player.radius, player.y));
 
-        if (boostActive && boostTimer > 0 && player.stamina > 0) {
-            player.stamina -= 100 / 1200; // Nitro süresine göre stamina tüketimini ayarladık
-            boostTimer--;
-            trail.push({ x: player.x, y: player.y, radius: 5, opacity: 0.5 });
-            if (player.stamina <= 0) {
+            if (boostActive && boostTimer > 0 && player.stamina > 0) {
+                player.stamina -= 100 / 1200;
+                boostTimer--;
+                trail.push({ x: player.x, y: player.y, radius: 5, opacity: 0.5 });
+                if (player.stamina <= 0) {
+                    boostActive = false;
+                    boostTimer = 0;
+                    player.boostCooldown = true;
+                }
+            } else {
                 boostActive = false;
                 boostTimer = 0;
-                player.boostCooldown = true;
-            }
-        } else {
-            boostActive = false;
-            boostTimer = 0;
-            if (!player.boostCooldown) {
-                player.stamina = Math.min(player.stamina + 0.1, player.maxStamina);
-            } else if (player.stamina < player.maxStamina) {
-                player.stamina += 0.1;
-                if (player.stamina >= player.maxStamina) {
-                    player.boostCooldown = false;
+                if (!player.boostCooldown) {
+                    player.stamina = Math.min(player.stamina + 0.1, player.maxStamina);
+                } else if (player.stamina < player.maxStamina) {
+                    player.stamina += 0.1;
+                    if (player.stamina >= player.maxStamina) {
+                        player.boostCooldown = false;
+                    }
                 }
             }
-        }
 
-        if (player.shakeTimer > 0) player.shakeTimer--;
+            if (player.shakeTimer > 0) player.shakeTimer--;
+        }
 
         moveDots();
         moveJeets();
