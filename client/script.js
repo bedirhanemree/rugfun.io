@@ -102,8 +102,8 @@ function initializeDots() {
         else type = foodTypes[3];
 
         dots.push({
-            x: 5000 + (Math.random() - 0.5) * 2000, // Oyuncuya yakın başlat
-            y: 5000 + (Math.random() - 0.5) * 2000, // Oyuncuya yakın başlat
+            x: Math.random() * mapWidth, // Tüm haritaya dağıt
+            y: Math.random() * mapHeight, // Tüm haritaya dağıt
             type,
             wallet: Math.floor(Math.random() * (type.max - type.min)) + type.min,
             angle: Math.random() * Math.PI * 2,
@@ -115,9 +115,9 @@ function initializeDots() {
 initializeDots();
 
 const jeetImage = new Image();
-jeetImage.src = "/jeet.png"; // Dosya yolunu netleştir
+jeetImage.src = "/jeet.png"; // Sunucudan statik dosya
 const jeetAngryImage = new Image();
-jeetAngryImage.src = "/jeet_angry.png"; // Dosya yolunu netleştir
+jeetAngryImage.src = "/jeet_angry.png"; // Sunucudan statik dosya
 
 // Resim yükleme kontrolü
 jeetImage.onload = () => console.log("jeet.png loaded successfully");
@@ -131,8 +131,8 @@ function initializeJeets() {
     for (let i = 0; i < 20; i++) {
         const wallet = Math.floor(Math.random() * (1000000 - 100000)) + 100000;
         jeets.push({
-            x: 5000 + (Math.random() - 0.5) * 2000, // Oyuncuya yakın başlat
-            y: 5000 + (Math.random() - 0.5) * 2000, // Oyuncuya yakın başlat
+            x: Math.random() * mapWidth, // Tüm haritaya dağıt
+            y: Math.random() * mapHeight, // Tüm haritaya dağıt
             radius: 20 + (wallet / 1000000) * 30,
             speed: 1,
             angle: Math.random() * Math.PI * 2,
@@ -157,8 +157,8 @@ initializeJeets();
 function spawnNewJeet() {
     const wallet = Math.floor(Math.random() * (1000000 - 100000)) + 100000;
     return {
-        x: 5000 + (Math.random() - 0.5) * 2000, // Oyuncuya yakın başlat
-        y: 5000 + (Math.random() - 0.5) * 2000, // Oyuncuya yakın başlat
+        x: Math.random() * mapWidth, // Tüm haritaya dağıt
+        y: Math.random() * mapHeight, // Tüm haritaya dağıt
         radius: 20 + (wallet / 1000000) * 30,
         speed: 1,
         angle: Math.random() * Math.PI * 2,
@@ -234,13 +234,14 @@ socket.on('player-died', (playerId) => {
     console.log("Player died, updated players:", players);
 });
 
-// Sunucudan game state alındığında sadece gerekliyse güncelle
-socket.on('update-game-state', (gameState) => {
-    console.log("Received game state:", gameState); // Hata ayıklama
+// Sunucudan ilk oyun durumu alındığında
+socket.on('init-game-state', (gameState) => {
+    console.log("Received init game state:", gameState); // Hata ayıklama
     if (gameState.dots && gameState.dots.length > 0) {
         dots = gameState.dots;
     } else {
-        console.warn("No dots received from server, keeping local dots");
+        console.warn("No dots in init-game-state, using local dots");
+        initializeDots();
     }
     if (gameState.jeets && gameState.jeets.length > 0) {
         jeets = gameState.jeets.map(jeet => ({
@@ -248,11 +249,33 @@ socket.on('update-game-state', (gameState) => {
             image: jeet.angry ? jeetAngryImage : jeetImage
         }));
     } else {
-        console.warn("No jeets received from server, keeping local jeets");
+        console.warn("No jeets in init-game-state, using local jeets");
+        initializeJeets();
     }
     rugs = gameState.rugs || rugs;
     businesses = gameState.businesses || businesses;
-    console.log("Updated jeets:", jeets.length, "Updated dots:", dots.length);
+    console.log("Initialized - Jeets:", jeets.length, "Dots:", dots.length);
+});
+
+// Sunucudan oyun durumu güncellemeleri alındığında
+socket.on('update-game-state', (gameState) => {
+    console.log("Received update game state:", gameState); // Hata ayıklama
+    if (gameState.dots && gameState.dots.length > 0) {
+        dots = gameState.dots;
+    } else {
+        console.warn("No dots in update-game-state, keeping local dots");
+    }
+    if (gameState.jeets && gameState.jeets.length > 0) {
+        jeets = gameState.jeets.map(jeet => ({
+            ...jeet,
+            image: jeet.angry ? jeetAngryImage : jeetImage
+        }));
+    } else {
+        console.warn("No jeets in update-game-state, keeping local jeets");
+    }
+    rugs = gameState.rugs || rugs;
+    businesses = gameState.businesses || businesses;
+    console.log("Updated - Jeets:", jeets.length, "Dots:", dots.length);
 });
 
 if (!startButton) {
@@ -325,8 +348,7 @@ function startGame() {
     leaderboard.style.display = "block";
     coinInfo.style.display = "block";
 
-    initializeDots();
-    initializeJeets();
+    // Sunucudan veri bekleniyor, yerel başlatma kaldırıldı
     trail = [];
     particles = [];
 
@@ -633,6 +655,8 @@ function drawDots(viewX, viewY, viewWidth, viewHeight) {
         if (dot.x > viewX - 50 && dot.x < viewX + viewWidth + 50 && dot.y > viewY - 50 && dot.y < viewY + viewHeight + 50) {
             ctx.fillStyle = dot.type.color;
             ctx.fillText(dot.type.emoji, dot.x, dot.y);
+        } else {
+            console.log(`Dot at (${dot.x}, ${dot.y}) is out of view`); // Hata ayıklama
         }
     }
 }
@@ -755,6 +779,7 @@ function checkCollisions() {
             normalizeHolderPercentages();
 
             dots.splice(i, 1);
+            socket.emit('dot-collected', i); // Sunucuya bildir
         }
     }
 }
@@ -762,23 +787,27 @@ function checkCollisions() {
 function checkJeetCollisions() {
     if (!player.isAlive) return;
     const attachedJeets = jeets.filter(jeet => jeet.attached).length;
-    for (let jeet of jeets) {
+    for (let i = 0; i < jeets.length; i++) {
+        let jeet = jeets[i];
         if (jeet.attached || jeet.flame) continue;
         const dx = player.x - jeet.x;
         const dy = player.y - jeet.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < player.radius + jeet.radius && player.marketcap >= jeet.wallet && attachedJeets < 2) {
             jeet.attached = true;
+            jeet.attachedPlayerId = player.id; // Sunucu için
             jeet.orbitAngle = Math.random() * Math.PI * 2;
             const attachDurations = [180, 300, 420, 600, 780];
             jeet.attachTimer = attachDurations[Math.floor(Math.random() * attachDurations.length)];
+            socket.emit('jeet-attached', i, player.id); // Sunucuya bildir
         }
     }
 }
 
 function checkRugCollisions() {
     if (!player.isAlive) return;
-    for (let rug of rugs) {
+    for (let i = 0; i < rugs.length; i++) {
+        let rug = rugs[i];
         if (!rug.active) continue;
         const dx = player.x - rug.x;
         const dy = player.y - rug.y;
@@ -798,6 +827,7 @@ function checkRugCollisions() {
             }
             updateRadius(player);
             rug.active = false;
+            socket.emit('rug-collided', i); // Sunucuya bildir
             setTimeout(() => (rug.active = true), 30000);
         }
     }
