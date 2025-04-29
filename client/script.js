@@ -26,7 +26,7 @@ let player = {
     marketcap: 1000,
     color: "#33ff33",
     speed: 2,
-    maxSpeed: 3,
+    maxSpeed: 3, // Hızı azalttık (5'ten 3'e)
     image: null,
     zoom: 1,
     stamina: 100,
@@ -91,34 +91,97 @@ const memecoinEmojis = ["🐶", "🐕", "🐸", "🧢", "🚀"];
 let dots = [];
 let trail = [];
 
+function initializeDots() {
+    dots = [];
+    for (let i = 0; i < 1000; i++) {
+        const rand = Math.random();
+        let type;
+        if (rand < 0.6) type = foodTypes[0];
+        else if (rand < 0.85) type = foodTypes[1];
+        else if (rand < 0.97) type = foodTypes[2];
+        else type = foodTypes[3];
+
+        dots.push({
+            x: Math.random() * mapWidth,
+            y: Math.random() * mapHeight,
+            type,
+            wallet: Math.floor(Math.random() * (type.max - type.min)) + type.min,
+            angle: Math.random() * Math.PI * 2,
+        });
+    }
+}
+
+initializeDots();
+
 const jeetImage = new Image();
 jeetImage.src = "jeet.png";
 const jeetAngryImage = new Image();
 jeetAngryImage.src = "jeet_angry.png";
 
 let jeets = [];
-let rugs = [];
-let businesses = [];
+function initializeJeets() {
+    jeets = [];
+    for (let i = 0; i < 20; i++) {
+        const wallet = Math.floor(Math.random() * (1000000 - 100000)) + 100000;
+        jeets.push({
+            x: Math.random() * mapWidth,
+            y: Math.random() * mapHeight,
+            radius: 20 + (wallet / 1000000) * 30,
+            speed: 1,
+            angle: Math.random() * Math.PI * 2,
+            image: jeetImage,
+            angry: false,
+            angryTimer: 0,
+            wallet: wallet,
+            flame: false,
+            flameTimer: 0,
+            shakeTimer: 0,
+            attached: false,
+            attachTimer: 0,
+            orbitAngle: 0,
+            opacity: 1,
+        });
+    }
+}
 
-socket.on('init-game-state', (gameState) => {
-    dots = gameState.dots;
-    jeets = gameState.jeets;
-    rugs = gameState.rugs;
-    businesses = gameState.businesses;
-    jeets.forEach(jeet => {
-        jeet.image = jeet.angry ? jeetAngryImage : jeetImage;
-    });
-});
+initializeJeets();
 
-socket.on('update-game-state', (gameState) => {
-    dots = gameState.dots;
-    jeets = gameState.jeets;
-    rugs = gameState.rugs;
-    businesses = gameState.businesses;
-    jeets.forEach(jeet => {
-        jeet.image = jeet.angry ? jeetAngryImage : jeetImage;
+function spawnNewJeet() {
+    const wallet = Math.floor(Math.random() * (1000000 - 100000)) + 100000;
+    return {
+        x: Math.random() * mapWidth,
+        y: Math.random() * mapHeight,
+        radius: 20 + (wallet / 1000000) * 30,
+        speed: 1,
+        angle: Math.random() * Math.PI * 2,
+        image: jeetImage,
+        angry: false,
+        angryTimer: 0,
+        wallet: wallet,
+        flame: false,
+        flameTimer: 0,
+        shakeTimer: 0,
+        attached: false,
+        attachTimer: 0,
+        orbitAngle: 0,
+        opacity: 1,
+    };
+}
+
+const rugs = [];
+for (let i = 0; i < 5; i++) {
+    rugs.push({
+        x: Math.random() * mapWidth,
+        y: Math.random() * mapHeight,
+        radius: 20,
+        active: Math.random() > 0.5,
     });
-});
+}
+
+let businesses = [
+    { x: 200, y: 200, radius: 20, color: 'green', income: 50 },
+    { x: 800, y: 800, radius: 20, color: 'green', income: 50 }
+];
 
 socket.on('init-players', (serverPlayers) => {
     players = serverPlayers;
@@ -144,23 +207,26 @@ socket.on('update-players', (serverPlayers) => {
             p.slimeDeform = 0;
         }
     });
+    // Players listesini kontrol et
+    console.log("Updated players:", players);
 });
 
 socket.on('player-died', (playerId) => {
     players = players.filter(p => p.id !== playerId);
+    console.log("Player died, updated players:", players);
 });
 
 if (!startButton) {
     console.error("Start button not found! Check if 'startButton' ID exists in your HTML.");
 } else {
+    startButton.disabled = false;
+
     socket.on('connect', () => {
         console.log("Socket.io connected, ID:", socket.id);
-        startButton.disabled = false;
     });
 
     socket.on('connect_error', (error) => {
         console.error("Socket.io connection error:", error);
-        startButton.disabled = true;
     });
 
     startButton.addEventListener("click", () => {
@@ -181,14 +247,9 @@ if (!startButton) {
                     startGame();
                 };
                 img.onerror = () => {
-                    console.error("Failed to load image. Starting game without image.");
                     startGame();
                 };
                 img.src = e.target.result;
-            };
-            reader.onerror = () => {
-                console.error("Failed to read file. Starting game without image.");
-                startGame();
             };
             reader.readAsDataURL(coinImageInput.files[0]);
         } else {
@@ -225,6 +286,8 @@ function startGame() {
     leaderboard.style.display = "block";
     coinInfo.style.display = "block";
 
+    initializeDots();
+    initializeJeets();
     trail = [];
     particles = [];
 
@@ -320,14 +383,194 @@ function drawParticles() {
     }
 }
 
+function moveDots() {
+    for (let dot of dots) {
+        const dx = player.x - dot.x;
+        const dy = player.y - dot.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const pullSpeed = 2;
+        const escapeSpeed = 0.5;
+
+        if (player.marketcap < 10000) {
+            if (dist < 300) {
+                dot.x -= (dx / dist) * escapeSpeed;
+                dot.y -= (dy / dist) * escapeSpeed;
+            } else {
+                dot.angle += (Math.random() - 0.5) * 0.3;
+                dot.x += Math.cos(dot.angle) * dot.type.speed;
+                dot.y += Math.sin(dot.angle) * dot.type.speed;
+            }
+        } else if (player.marketcap >= 10000 && player.marketcap < 75000) {
+            if (dot.type.emoji === "🐛") {
+                if (dist < 300) {
+                    dot.x += (dx / dist) * pullSpeed;
+                    dot.y += (dy / dist) * pullSpeed;
+                } else {
+                    dot.angle += (Math.random() - 0.5) * 0.3;
+                    dot.x += Math.cos(dot.angle) * dot.type.speed;
+                    dot.y += Math.sin(dot.angle) * dot.type.speed;
+                }
+            } else {
+                if (dist < 300) {
+                    dot.x -= (dx / dist) * escapeSpeed;
+                    dot.y -= (dy / dist) * escapeSpeed;
+                } else {
+                    dot.angle += (Math.random() - 0.5) * 0.3;
+                    dot.x += Math.cos(dot.angle) * dot.type.speed;
+                    dot.y += Math.sin(dot.angle) * dot.type.speed;
+                }
+            }
+        } else if (player.marketcap >= 75000 && player.marketcap < 150000) {
+            if (dot.type.emoji === "🐛" || dot.type.emoji === "🐟") {
+                if (dist < 300) {
+                    dot.x += (dx / dist) * pullSpeed;
+                    dot.y += (dy / dist) * pullSpeed;
+                } else {
+                    dot.angle += (Math.random() - 0.5) * 0.3;
+                    dot.x += Math.cos(dot.angle) * dot.type.speed;
+                    dot.y += Math.sin(dot.angle) * dot.type.speed;
+                }
+            } else {
+                if (dist < 300) {
+                    dot.x -= (dx / dist) * escapeSpeed;
+                    dot.y -= (dy / dist) * escapeSpeed;
+                } else {
+                    dot.angle += (Math.random() - 0.5) * 0.3;
+                    dot.x += Math.cos(dot.angle) * dot.type.speed;
+                    dot.y += Math.sin(dot.angle) * dot.type.speed;
+                }
+            }
+        } else if (player.marketcap >= 150000 && player.marketcap < 500000) {
+            if (dot.type.emoji === "🐛" || dot.type.emoji === "🐟" || dot.type.emoji === "🦈") {
+                if (dist < 300) {
+                    dot.x += (dx / dist) * pullSpeed;
+                    dot.y += (dy / dist) * pullSpeed;
+                } else {
+                    dot.angle += (Math.random() - 0.5) * 0.3;
+                    dot.x += Math.cos(dot.angle) * dot.type.speed;
+                    dot.y += Math.sin(dot.angle) * dot.type.speed;
+                }
+            } else {
+                if (dist < 300) {
+                    dot.x -= (dx / dist) * escapeSpeed;
+                    dot.y -= (dy / dist) * escapeSpeed;
+                } else {
+                    dot.angle += (Math.random() - 0.5) * 0.3;
+                    dot.x += Math.cos(dot.angle) * dot.type.speed;
+                    dot.y += Math.sin(dot.angle) * dot.type.speed;
+                }
+            }
+        } else if (player.marketcap >= 500000) {
+            if (dist < 300) {
+                dot.x += (dx / dist) * pullSpeed;
+                dot.y += (dy / dist) * pullSpeed;
+            } else {
+                dot.angle += (Math.random() - 0.5) * 0.3;
+                dot.x += Math.cos(dot.angle) * dot.type.speed;
+                dot.y += Math.sin(dot.angle) * dot.type.speed;
+            }
+        }
+
+        if (dot.x < 0 || dot.x > mapWidth) dot.angle = Math.PI - dot.angle;
+        if (dot.y < 0 || dot.y > mapHeight) dot.angle = -dot.angle;
+    }
+}
+
+function moveJeets() {
+    for (let i = 0; i < jeets.length; i++) {
+        let jeet = jeets[i];
+        updateRadius(jeet);
+        if (jeet.attached) {
+            jeet.orbitAngle += 0.05;
+            const orbitRadius = player.radius + jeet.radius + 10;
+            jeet.x = player.x + Math.cos(jeet.orbitAngle) * orbitRadius;
+            jeet.y = player.y + Math.sin(jeet.orbitAngle) * orbitRadius;
+
+            jeet.attachTimer--;
+            if (jeet.attachTimer <= 0) {
+                jeet.attached = false;
+                jeet.flame = true;
+                jeet.flameTimer = 120;
+                jeet.shakeTimer = 30;
+                player.shakeTimer = 30;
+                const stolenAmount = jeet.wallet;
+                player.marketcap -= stolenAmount;
+                if (player.marketcap <= 0) {
+                    player.marketcap = 0;
+                    player.isAlive = false;
+                    createExplosion(player.x, player.y, player.radius);
+                    socket.emit('player-died', player.id);
+                    setTimeout(() => {
+                        startScreen.style.display = "block";
+                        leaderboard.style.display = "none";
+                        coinInfo.style.display = "none";
+                    }, 2000);
+                }
+                updateRadius(player);
+                createExplosion(jeet.x, jeet.y, jeet.radius);
+                const edgeAngles = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
+                jeet.angle = edgeAngles[Math.floor(Math.random() * edgeAngles.length)];
+            }
+            continue;
+        }
+
+        const dx = player.x - jeet.x;
+        const dy = player.y - jeet.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        let jeetSpeed = jeet.speed;
+
+        if (jeet.flame && jeet.flameTimer > 0) {
+            jeetSpeed *= 5;
+            jeet.flameTimer--;
+            jeet.opacity -= 1 / 120;
+            jeet.x += Math.cos(jeet.angle) * jeetSpeed;
+            jeet.y += Math.sin(jeet.angle) * jeetSpeed;
+
+            if (jeet.flameTimer <= 0 || jeet.x < 0 || jeet.x > mapWidth || jeet.y < 0 || jeet.y > mapHeight) {
+                jeets.splice(i, 1);
+                jeets.push(spawnNewJeet());
+                i--;
+            }
+        } else if (dist < 2000 && player.marketcap >= jeet.wallet) {
+            if (!jeet.angry) {
+                jeet.angry = true;
+                jeet.angryTimer = 900;
+            }
+            if (jeet.angry) {
+                jeet.image = jeetAngryImage;
+                jeetSpeed *= 2;
+                jeet.angle = Math.atan2(dy, dx);
+                jeet.angryTimer--;
+                if (jeet.angryTimer <= 0) {
+                    jeet.angry = false;
+                    jeet.image = jeetImage;
+                }
+            }
+        } else {
+            jeet.angry = false;
+            jeet.image = jeetImage;
+            jeet.angle += (Math.random() - 0.5) * 0.3;
+        }
+
+        jeet.x += Math.cos(jeet.angle) * jeetSpeed;
+        jeet.y += Math.sin(jeet.angle) * jeetSpeed;
+        if (jeet.x < 0 || jeet.x > mapWidth) jeet.angle = Math.PI - jeet.angle;
+        if (jeet.y < 0 || jeet.y > mapHeight) jeet.angle = -jeet.angle;
+
+        if (jeet.shakeTimer > 0) jeet.shakeTimer--;
+    }
+}
+
 function drawBackground(viewX, viewY, viewWidth, viewHeight) {
     ctx.fillStyle = "#1a1a1a";
     ctx.fillRect(viewX, viewY, viewWidth, viewHeight);
 
-    ctx.strokeStyle = "lime";
-    ctx.lineWidth = 5;
+    // Harita sınırlarını yeşil renkte çiz
+    ctx.strokeStyle = "lime"; // Yeşil renk
+    ctx.lineWidth = 5; // Çizgi kalınlığı
     ctx.strokeRect(0, 0, mapWidth, mapHeight);
 
+    // Arka plan ızgara çizgileri
     ctx.strokeStyle = "#333";
     ctx.lineWidth = 1;
     for (let x = Math.floor(viewX / 200) * 200; x <= viewX + viewWidth; x += 200) {
@@ -441,7 +684,7 @@ function checkCollisions() {
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < player.radius + dots[i].type.size) {
             player.marketcap += dots[i].wallet;
-            player.speed = Math.min(player.speed + 0.01, player.maxSpeed);
+            player.speed = Math.min(player.speed + 0.01, player.maxSpeed); // Hız artışını azalttık (0.05'ten 0.01'e)
             updateRadius(player);
 
             const holderAddress = generateRandomAddress();
@@ -455,7 +698,7 @@ function checkCollisions() {
 
             normalizeHolderPercentages();
 
-            socket.emit('dot-collected', i);
+            dots.splice(i, 1);
         }
     }
 }
@@ -463,22 +706,23 @@ function checkCollisions() {
 function checkJeetCollisions() {
     if (!player.isAlive) return;
     const attachedJeets = jeets.filter(jeet => jeet.attached).length;
-    for (let i = 0; i < jeets.length; i++) {
-        const jeet = jeets[i];
+    for (let jeet of jeets) {
         if (jeet.attached || jeet.flame) continue;
         const dx = player.x - jeet.x;
         const dy = player.y - jeet.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < player.radius + jeet.radius && player.marketcap >= jeet.wallet && attachedJeets < 2) {
-            socket.emit('jeet-attached', i);
+            jeet.attached = true;
+            jeet.orbitAngle = Math.random() * Math.PI * 2;
+            const attachDurations = [180, 300, 420, 600, 780];
+            jeet.attachTimer = attachDurations[Math.floor(Math.random() * attachDurations.length)];
         }
     }
 }
 
 function checkRugCollisions() {
     if (!player.isAlive) return;
-    for (let i = 0; i < rugs.length; i++) {
-        const rug = rugs[i];
+    for (let rug of rugs) {
         if (!rug.active) continue;
         const dx = player.x - rug.x;
         const dy = player.y - rug.y;
@@ -497,7 +741,8 @@ function checkRugCollisions() {
                 }, 2000);
             }
             updateRadius(player);
-            socket.emit('rug-collided', i);
+            rug.active = false;
+            setTimeout(() => (rug.active = true), 30000);
         }
     }
 }
@@ -632,10 +877,13 @@ function drawPlayer(p, worldMouseX, worldMouseY) {
 }
 
 function drawOtherPlayers(viewX, viewY, viewWidth, viewHeight) {
+    // Görünürlük kontrolünü sadeleştir
     for (let p of players) {
         if (p.id === player.id) continue;
+        // Oyuncunun görünür olup olmadığını kontrol et
         if (p.x > viewX - 100 && p.x < viewX + viewWidth + 100 && p.y > viewY - 100 && p.y < viewY + viewHeight + 100) {
             drawPlayer(p, p.x, p.y);
+            console.log("Drawing other player:", p); // Hata ayıklama için
         }
     }
 }
@@ -728,13 +976,8 @@ function drawTrail() {
     }
 }
 
-let lastTime = 0;
-
-function gameLoop(timestamp) {
+function gameLoop() {
     try {
-        const deltaTime = (timestamp - lastTime) / 16.67;
-        lastTime = timestamp;
-
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         if (!player.isAlive) {
@@ -765,9 +1008,9 @@ function gameLoop(timestamp) {
 
         if (player.isAlive) {
             const angle = Math.atan2(target.y - canvas.height / 2, target.x - canvas.width / 2);
-            const moveSpeed = boostActive ? player.speed * 2 : player.speed;
-            player.x += Math.cos(angle) * moveSpeed * 2;
-            player.y += Math.sin(angle) * moveSpeed * 2;
+            const moveSpeed = boostActive ? player.speed * 2 : player.speed; // Boost etkisini azalttık (3'ten 2'ye)
+            player.x += Math.cos(angle) * moveSpeed * 0.5;
+            player.y += Math.sin(angle) * moveSpeed * 0.5;
             player.x = Math.max(player.radius, Math.min(mapWidth - player.radius, player.x));
             player.y = Math.max(player.radius, Math.min(mapHeight - player.radius, player.y));
 
@@ -796,6 +1039,8 @@ function gameLoop(timestamp) {
             if (player.shakeTimer > 0) player.shakeTimer--;
         }
 
+        moveDots();
+        moveJeets();
         checkCollisions();
         checkJeetCollisions();
         checkRugCollisions();
@@ -830,7 +1075,7 @@ function gameLoop(timestamp) {
             speed: player.speed
         });
 
-        requestAnimationFrame(gameLoop);
+        requestAnimationFrame(gameLoop Towards);
     } catch (error) {
         console.error("Error in game loop:", error);
     }
