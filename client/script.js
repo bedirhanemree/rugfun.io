@@ -33,7 +33,86 @@ let player = {
     maxStamina: 100,
     shakeTimer: 0,
     boostCooldown: false,
+    slimePoints: [],
+    slimeDeform: 0,
 };
+
+function drawPlayer(p) {
+    // Mouse yönünü hesapla
+    const angleToMouse = Math.atan2(target.y - canvas.height / 2, target.x - canvas.width / 2);
+    
+    // Slime deformasyonunu güncelle (dalgalanma efekti için)
+    p.slimeDeform += 0.1;
+    
+    // Slime noktalarını oluştur (dalgalı kenar efekti)
+    const numPoints = 20; // Kenardaki nokta sayısı
+    const points = [];
+    const baseRadius = p.radius;
+    
+    for (let i = 0; i < numPoints; i++) {
+        const angle = (i / numPoints) * Math.PI * 2;
+        let radiusOffset = Math.sin(p.slimeDeform + angle * 3) * 5; // Hafif dalgalanma
+        
+        // Mouse yönüne doğru uzama efekti
+        const mouseInfluence = Math.cos(angle - angleToMouse);
+        radiusOffset += mouseInfluence * 10; // Mouse yönüne doğru 10 birim uzama
+        
+        const radius = baseRadius + radiusOffset;
+        const x = p.x + Math.cos(angle) * radius;
+        const y = p.y + Math.sin(angle) * radius;
+        points.push({ x, y });
+    }
+    
+    // Slime'ı çiz
+    ctx.beginPath();
+    const shakeOffset = p.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
+    ctx.moveTo(points[0].x + shakeOffset, points[0].y + shakeOffset);
+    
+    for (let i = 1; i < points.length; i++) {
+        const prev = points[i - 1];
+        const curr = points[i];
+        const next = points[(i + 1) % points.length];
+        
+        // Yumuşak eğriler için kontrol noktaları
+        const xc = (curr.x + prev.x) / 2;
+        const yc = (curr.y + prev.y) / 2;
+        ctx.quadraticCurveTo(prev.x, prev.y, xc, yc);
+    }
+    
+    // Kapat ve doldur
+    ctx.closePath();
+    
+    // Gölge efekti (slime hissiyatı için)
+    ctx.shadowColor = "rgba(0, 255, 0, 0.5)";
+    ctx.shadowBlur = 10;
+    
+    // Slime dolgusu
+    if (p.image) {
+        ctx.save();
+        ctx.clip();
+        ctx.drawImage(p.image, p.x - p.radius + shakeOffset, p.y - p.radius + shakeOffset, p.radius * 2, p.radius * 2);
+        ctx.restore();
+    } else {
+        ctx.fillStyle = p.color;
+        ctx.fill();
+    }
+    
+    // Kenar çizgisi
+    ctx.strokeStyle = "lime";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    // Gölgeyi sıfırla
+    ctx.shadowBlur = 0;
+    
+    // İsim ve market cap yazısı
+    ctx.fillStyle = "white";
+    ctx.font = "14px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(p.name, p.x + shakeOffset, p.y - p.radius - 15 + shakeOffset);
+    ctx.font = "12px Arial";
+    ctx.fillText(`$${formatMarketCap(p.marketcap)}`, p.x + shakeOffset, p.y + p.radius + 20 + shakeOffset);
+}
 
 // Oyuncunun başlangıç radius değerini marketcap'e göre güncelle
 updateRadius(player);
