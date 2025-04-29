@@ -1,31 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RUGFUN.io</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RUGFUN.IO</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="startScreen">
-    <input type="text" id="coinName" placeholder="Coin Name">
-    <input type="file" id="coinImage" accept="image/*">
-    <button id="startButton">Start Game</button>
-  </div>
-  <canvas id="gameCanvas"></canvas>
-  <div id="leaderboard"></div>
-  <div id="coinInfo">
-    <div id="coinName"></div>
-    <div id="topHoldersTitle">Top Holders:</div>
-    <div id="topHolders"></div>
-    <div id="bondingCurve">
-        <div>Bonding Curve: <span id="bondingCurvePercentage">0%</span></div>
-        <div id="bondingCurveBar">
-            <div id="bondingCurveFill"></div>
-        </div>
+    <div id="startScreen">
+        <input id="coinName" type="text" placeholder="Coin Name">
+        <input id="coinImage" type="file" accept="image/*">
+        <button id="startButton">Start Game</button>
     </div>
-</div>
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="script.js"></script>
+    <canvas id="gameCanvas"></canvas>
+    <div id="leaderboard"></div>
+    <div id="coinInfo">
+        <div id="coinName"></div>
+        <div id="bondingCurve">
+            <div>Bonding Curve: <span id="bondingCurvePercentage">0%</span></div>
+            <div id="bondingCurveBar">
+                <div id="bondingCurveFill"></div>
+            </div>
+        </div>
+        <div id="topHoldersTitle">Top Holders:</div>
+        <div id="topHolders"></div>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
