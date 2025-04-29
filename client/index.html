@@ -5,14 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RUGFUN.IO</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="favicon.png">
 </head>
 <body>
     <div id="startScreen">
+        <label for="coinName">Coin Name:</label>
         <input id="coinName" type="text" placeholder="Coin Name">
+        <label for="coinImage">Coin Image:</label>
         <input id="coinImage" type="file" accept="image/*">
         <button id="startButton">Start Game</button>
     </div>
     <canvas id="gameCanvas"></canvas>
+    <div id="failedText">FAILED</div>
+    <div id="restartText">Press 'R' to restart the game</div>
     <div id="leaderboard"></div>
     <div id="coinInfo">
         <div id="coinName"></div>
