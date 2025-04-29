@@ -895,6 +895,16 @@ function gameLoop() {
         player.x = Math.max(player.radius, Math.min(mapWidth - player.radius, player.x));
         player.y = Math.max(player.radius, Math.min(mapHeight - player.radius, player.y));
 
+            drawPlayer(player); // Bu satırın olduğundan emin ol
+        drawOtherPlayers(viewX, viewY, viewWidth, viewHeight);
+        drawParticles();
+
+        ctx.restore();
+
+        drawMinimap();
+        drawLeaderboard();
+        drawStaminaBar();
+
         if (boostActive && boostTimer > 0 && player.stamina > 0) {
             player.stamina -= 100 / 900;
             boostTimer--;
