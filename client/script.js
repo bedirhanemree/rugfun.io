@@ -7,7 +7,6 @@ const ctx = canvas.getContext("2d");
 const failedText = document.getElementById("failedText");
 const restartText = document.getElementById("restartText");
 
-// Socket.io bağlantısını kur
 const socket = io();
 
 canvas.width = window.innerWidth;
@@ -37,11 +36,11 @@ let player = {
     boostCooldown: false,
     slimePoints: [],
     slimeDeform: 0,
+    allHolders: [],
     holders: [],
     hasBonded: false,
 };
 
-// Slime noktalarını başlat
 function initializeSlimePoints() {
     const numPoints = 20;
     player.slimePoints = [];
@@ -60,20 +59,17 @@ function initializeSlimePoints() {
 
 initializeSlimePoints();
 
-// Oyuncunun başlangıç radius değerini marketcap'e göre güncelle
 function updateRadius(entity) {
     const baseRadius = 20;
     const divisor = 1000000;
     const multiplier = 60;
     entity.radius = baseRadius + (entity.marketcap || entity.wallet) / divisor * multiplier;
     entity.radius = Math.max(20, Math.min(100, entity.radius));
-    console.log(`Updated radius for ${entity.name || 'JEET'}: ${entity.radius}, Marketcap/Wallet: ${entity.marketcap || entity.wallet}`);
     initializeSlimePoints();
 }
 
 updateRadius(player);
 
-// Tüm oyuncuların listesi (sunucudan alınacak)
 let players = [];
 let target = { x: canvas.width / 2, y: canvas.height / 2 };
 
@@ -83,10 +79,10 @@ let boostTimer = 0;
 let particles = [];
 
 const foodTypes = [
-    { emoji: "🐛", min: 100, max: 1000, speed: 0.2, size: 8, color: "#66ff66" }, // Solucan
-    { emoji: "🐟", min: 1000, max: 5000, speed: 0.4, size: 12, color: "#66ccff" }, // Balık
-    { emoji: "🦈", min: 5000, max: 10000, speed: 0.6, size: 16, color: "#ff9966" }, // Yunus
-    { emoji: "🐋", min: 10000, max: 100000, speed: 1.0, size: 24, color: "#ff66cc" }, // Balina
+    { emoji: "🐛", min: 100, max: 1000, speed: 0.2, size: 8, color: "#66ff66" },
+    { emoji: "🐟", min: 1000, max: 5000, speed: 0.4, size: 12, color: "#66ccff" },
+    { emoji: "🦈", min: 5000, max: 10000, speed: 0.6, size: 16, color: "#ff9966" },
+    { emoji: "🐋", min: 10000, max: 100000, speed: 1.0, size: 24, color: "#ff66cc" },
 ];
 
 const memecoinNames = ["DOGEFUN", "SHIBKING", "PEPEMOON", "WIFHAT", "FLOKIROCKET"];
@@ -112,7 +108,6 @@ for (let i = 0; i < 1000; i++) {
     });
 }
 
-// JEET düşmanları
 const jeetImage = new Image();
 jeetImage.src = "jeet.png";
 const jeetAngryImage = new Image();
@@ -163,7 +158,6 @@ function spawnNewJeet() {
     };
 }
 
-// RUG tuzakları
 const rugs = [];
 for (let i = 0; i < 5; i++) {
     rugs.push({
@@ -174,28 +168,22 @@ for (let i = 0; i < 5; i++) {
     });
 }
 
-// İşletmeler
 let businesses = [
     { x: 200, y: 200, radius: 20, color: 'green', income: 50 },
     { x: 800, y: 800, radius: 20, color: 'green', income: 50 }
 ];
 
-// Sunucudan gelen oyuncuları al
 socket.on('init-players', (serverPlayers) => {
-    console.log("Received init-players:", serverPlayers);
     players = serverPlayers;
 });
 
 socket.on('update-players', (serverPlayers) => {
-    console.log("Received update-players:", serverPlayers);
     players = serverPlayers;
 });
 
-// Socket bağlantısını kontrol et ve Start Game butonunu ayarla
 if (!startButton) {
     console.error("Start button not found! Check if 'startButton' ID exists in your HTML.");
 } else {
-    console.log("Start button found, setting up event listener...");
     startButton.disabled = false;
 
     socket.on('connect', () => {
@@ -207,8 +195,6 @@ if (!startButton) {
     });
 
     startButton.addEventListener("click", () => {
-        console.log("Start button clicked!");
-
         let name = coinNameInput ? coinNameInput.value.trim() : "";
         if (!name) {
             const randomIndex = Math.floor(Math.random() * memecoinNames.length);
@@ -216,27 +202,22 @@ if (!startButton) {
             if (coinNameInput) coinNameInput.value = name;
         }
         player.name = name;
-        console.log("Player name set to:", player.name);
 
         if (coinImageInput && coinImageInput.files.length > 0) {
-            console.log("Image selected, loading...");
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = new Image();
                 img.onload = () => {
-                    console.log("Image loaded successfully!");
                     player.image = img;
                     startGame();
                 };
                 img.onerror = () => {
-                    console.error("Player image failed to load!");
                     startGame();
                 };
                 img.src = e.target.result;
             };
             reader.readAsDataURL(coinImageInput.files[0]);
         } else {
-            console.log("No image selected, using emoji...");
             const randomIndex = Math.floor(Math.random() * memecoinEmojis.length);
             player.name += ` ${memecoinEmojis[randomIndex]}`;
             startGame();
@@ -245,16 +226,10 @@ if (!startButton) {
 }
 
 function startGame() {
-    console.log("startGame function called");
-    if (!startScreen) {
-        console.error("startScreen element not found in startGame!");
-        return;
-    }
+    if (!startScreen) return;
     startScreen.style.display = "none";
     gameStarted = true;
     player.id = socket.id || "temp-" + Math.random().toString(36).substr(2, 9);
-    console.log("Game started, player ID:", player.id);
-    console.log("gameStarted set to:", gameStarted);
     requestAnimationFrame(gameLoop);
 }
 
@@ -408,7 +383,6 @@ function moveJeets() {
                 player.shakeTimer = 30;
                 const stolenAmount = jeet.wallet;
                 player.marketcap -= stolenAmount;
-                // Market cap sıfırdan küçük olmamalı
                 if (player.marketcap <= 0) {
                     player.marketcap = 0;
                     gameOver = true;
@@ -591,9 +565,8 @@ function checkCollisions() {
 
             const holderAddress = generateRandomAddress();
             const percentage = (Math.random() * 4.9 + 0.1).toFixed(2);
-            player.holders.push({ address: holderAddress, percentage: parseFloat(percentage) });
-
-            // Top 20 Holders için sıralama ve sınır
+            player.allHolders.push({ address: holderAddress, percentage: parseFloat(percentage) });
+            player.holders = [...player.allHolders];
             player.holders.sort((a, b) => b.percentage - a.percentage);
             if (player.holders.length > 20) {
                 player.holders = player.holders.slice(0, 20);
@@ -630,7 +603,6 @@ function checkRugCollisions() {
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < player.radius + rug.radius) {
             player.marketcap *= 0.5;
-            // Market cap sıfırdan küçük olmamalı
             if (player.marketcap <= 0) {
                 player.marketcap = 0;
                 gameOver = true;
@@ -784,7 +756,7 @@ function drawPlayer(p, worldMouseX, worldMouseY) {
     ctx.fillText(p.name, p.x + shakeOffset, p.y - p.radius - 15 + shakeOffset);
     ctx.font = "12px Arial";
     ctx.fillText(`$${formatMarketCap(p.marketcap)}`, p.x + shakeOffset, p.y + p.radius + 20 + shakeOffset);
-    ctx.fillText(`Holders: ${player.holders.length}`, p.x + shakeOffset, p.y + p.radius + 35 + shakeOffset);
+    ctx.fillText(`Holders: ${player.allHolders.length}`, p.x + shakeOffset, p.y + p.radius + 35 + shakeOffset);
 }
 
 function drawOtherPlayers(viewX, viewY, viewWidth, viewHeight) {
@@ -913,31 +885,25 @@ function drawTrail() {
 }
 
 function showGameOver() {
-    // Kırmızı yanıp sönme efektini başlat
     canvas.classList.add("flash-red");
 
-    // FAILED yazısını göster (fade-in ve fade-out)
     failedText.style.animation = "fadeInOut 3s forwards";
 
-    // 3 saniye sonra "Press 'R' to restart" yazısını göster
     setTimeout(() => {
-        restartText.style.opacity = 1;
-    }, 3000);
+        ctx.fillStyle = "black";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // R tuşuna basıldığında oyunu yeniden başlat
-    window.addEventListener("keydown", restartGame);
-}
-
-function restartGame(e) {
-    if (e.code === "KeyR" && gameOver) {
+        startScreen.style.display = "block";
         gameOver = false;
-        gameStarted = true;
+        gameStarted = false;
+
         player.marketcap = 1000;
         player.speed = 2;
         player.x = mapWidth / 2;
         player.y = mapHeight / 2;
         player.stamina = 100;
         player.boostCooldown = false;
+        player.allHolders = [];
         player.holders = [];
         player.hasBonded = false;
         updateRadius(player);
@@ -963,24 +929,17 @@ function restartGame(e) {
                 opacity: 1,
             });
         }
-        // Efektleri sıfırla
         canvas.classList.remove("flash-red");
         failedText.style.animation = "none";
         failedText.style.opacity = 0;
         restartText.style.opacity = 0;
-        window.removeEventListener("keydown", restartGame);
-        requestAnimationFrame(gameLoop);
-    }
+    }, 3000);
 }
 
 function gameLoop() {
-    if (!gameStarted) {
-        console.log("gameLoop stopped: gameStarted is false");
-        return;
-    }
+    if (!gameStarted) return;
 
     try {
-        console.log("Game loop running...");
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         let targetZoom = 100 / player.radius;
