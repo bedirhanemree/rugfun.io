@@ -21,6 +21,7 @@ let player = {
     id: Math.random().toString(36).substr(2, 9),
     x: mapWidth / 2,
     y: mapHeight / 2,
+    maxSpeed: 5,
     radius: 30,
     name: "RUGFUN",
     marketcap: 1000,
@@ -485,6 +486,7 @@ function checkCollisions() {
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < player.radius + dots[i].type.size) {
             player.marketcap += dots[i].wallet;
+            player.speed = Math.min(player.speed + 0.05, player.maxSpeed);
             player.speed += 0.05;
             updateRadius(player);
             dots.splice(i, 1);
