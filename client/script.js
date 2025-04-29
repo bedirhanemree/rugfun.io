@@ -37,6 +37,25 @@ let player = {
     slimeDeform: 0,
 };
 
+// Slime noktalarını başlat
+function initializeSlimePoints() {
+    const numPoints = 20;
+    player.slimePoints = [];
+    for (let i = 0; i < numPoints; i++) {
+        const angle = (i / numPoints) * Math.PI * 2;
+        player.slimePoints.push({
+            x: player.x + Math.cos(angle) * player.radius,
+            y: player.y + Math.sin(angle) * player.radius,
+            targetX: 0,
+            targetY: 0,
+            vx: 0,
+            vy: 0,
+        });
+    }
+}
+
+initializeSlimePoints();
+
 // Oyuncunun başlangıç radius değerini marketcap'e göre güncelle
 function updateRadius(entity) {
     const baseRadius = 20;
@@ -45,6 +64,9 @@ function updateRadius(entity) {
     entity.radius = baseRadius + (entity.marketcap || entity.wallet) / divisor * multiplier;
     entity.radius = Math.max(20, Math.min(100, entity.radius));
     console.log(`Updated radius for ${entity.name || 'JEET'}: ${entity.radius}, Marketcap/Wallet: ${entity.marketcap || entity.wallet}`);
+
+    // Slime noktalarını yeniden başlat (radius değiştiğinde)
+    initializeSlimePoints();
 }
 
 updateRadius(player);
@@ -172,7 +194,7 @@ if (!startButton) {
     console.error("Start button not found! Check if 'startButton' ID exists in your HTML.");
 } else {
     console.log("Start button found, setting up event listener...");
-    startButton.disabled = false; // Butonu aktif et
+    startButton.disabled = false;
 
     socket.on('connect', () => {
         console.log("Socket.io connected, ID:", socket.id);
@@ -605,64 +627,66 @@ function checkFOMO() {
 }
 
 function drawPlayer(p, worldMouseX, worldMouseY) {
-    // Mouse yönünü dünya koordinatlarına göre hesapla
     const angleToMouse = Math.atan2(worldMouseY - p.y, worldMouseX - p.x);
-    
-    // Slime deformasyonunu güncelle (dalgalanma efekti için)
     p.slimeDeform += 0.1;
-    
-    // Slime noktalarını oluştur (dalgalı kenar efekti)
-    const numPoints = 20;
-    const points = [];
-    const baseRadius = p.radius;
-    
+    const numPoints = p.slimePoints.length;
+    const spring = 0.1;
+    const friction = 0.85;
+
     for (let i = 0; i < numPoints; i++) {
+        const point = p.slimePoints[i];
         const angle = (i / numPoints) * Math.PI * 2;
-        let radiusOffset = Math.sin(p.slimeDeform + angle * 3) * 5; // Hafif dalgalanma
-        
-        // Mouse yönüne doğru uzama efekti
+        let radiusOffset = Math.sin(p.slimeDeform + angle * 3) * 5;
         const mouseInfluence = Math.cos(angle - angleToMouse);
-        radiusOffset += mouseInfluence * 20; // Uzama efektini artırdık (10 yerine 20)
-        
-        const radius = baseRadius + radiusOffset;
-        const x = p.x + Math.cos(angle) * radius;
-        const y = p.y + Math.sin(angle) * radius;
-        points.push({ x, y });
+        radiusOffset += mouseInfluence * 30;
+        const targetRadius = p.radius + radiusOffset;
+        point.targetX = p.x + Math.cos(angle) * targetRadius;
+        point.targetY = p.y + Math.sin(angle) * targetRadius;
+        const dx = point.targetX - point.x;
+        const dy = point.targetY - point.y;
+        point.vx += dx * spring;
+        point.vy += dy * spring;
+        point.vx *= friction;
+        point.vy *= friction;
+        point.x += point.vx;
+        point.y += point.vy;
     }
-    
-    // Slime'ı çiz
+
     ctx.beginPath();
     const shakeOffset = p.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
-    ctx.moveTo(points[0].x + shakeOffset, points[0].y + shakeOffset);
-    
-    for (let i = 1; i < points.length; i++) {
-        const prev = points[i - 1];
-        const curr = points[i];
-        const next = points[(i + 1) % points.length];
+    ctx.moveTo(p.slimePoints[0].x + shakeOffset, p.slimePoints[0].y + shakeOffset);
+
+    for (let i = 1; i < p.slimePoints.length; i++) {
+        const prev = p.slimePoints[i - 1];
+        const curr = p.slimePoints[i];
+        const next = p.slimePoints[(i + 1) % p.slimePoints.length];
         const xc = (curr.x + prev.x) / 2;
         const yc = (curr.y + prev.y) / 2;
         ctx.quadraticCurveTo(prev.x, prev.y, xc, yc);
     }
-    
+
     ctx.closePath();
-    ctx.shadowColor = "rgba(0, 255, 0, 0.5)";
-    ctx.shadowBlur = 10;
-    
+    ctx.shadowColor = "rgba(0, 255, 0, 0.7)";
+    ctx.shadowBlur = 15;
+
+    const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius);
+    gradient.addColorStop(0, "rgba(51, 255, 51, 0.9)");
+    gradient.addColorStop(1, "rgba(0, 153, 0, 0.5)");
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
     if (p.image) {
         ctx.save();
         ctx.clip();
         ctx.drawImage(p.image, p.x - p.radius + shakeOffset, p.y - p.radius + shakeOffset, p.radius * 2, p.radius * 2);
         ctx.restore();
-    } else {
-        ctx.fillStyle = p.color;
-        ctx.fill();
     }
-    
+
     ctx.strokeStyle = "lime";
     ctx.lineWidth = 3;
     ctx.stroke();
     ctx.shadowBlur = 0;
-    
+
     ctx.fillStyle = "white";
     ctx.font = "14px Arial";
     ctx.textAlign = "center";
