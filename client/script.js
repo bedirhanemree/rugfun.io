@@ -26,7 +26,7 @@ let player = {
     marketcap: 1000,
     color: "#33ff33",
     speed: 2,
-    maxSpeed: 3, // Hızı azalttık (5'ten 3'e)
+    maxSpeed: 3,
     image: null,
     zoom: 1,
     stamina: 100,
@@ -207,26 +207,23 @@ socket.on('update-players', (serverPlayers) => {
             p.slimeDeform = 0;
         }
     });
-    // Players listesini kontrol et
-    console.log("Updated players:", players);
 });
 
 socket.on('player-died', (playerId) => {
     players = players.filter(p => p.id !== playerId);
-    console.log("Player died, updated players:", players);
 });
 
 if (!startButton) {
     console.error("Start button not found! Check if 'startButton' ID exists in your HTML.");
 } else {
-    startButton.disabled = false;
-
     socket.on('connect', () => {
         console.log("Socket.io connected, ID:", socket.id);
+        startButton.disabled = false;
     });
 
     socket.on('connect_error', (error) => {
         console.error("Socket.io connection error:", error);
+        startButton.disabled = true;
     });
 
     startButton.addEventListener("click", () => {
@@ -247,9 +244,14 @@ if (!startButton) {
                     startGame();
                 };
                 img.onerror = () => {
+                    console.error("Failed to load image. Starting game without image.");
                     startGame();
                 };
                 img.src = e.target.result;
+            };
+            reader.onerror = () => {
+                console.error("Failed to read file. Starting game without image.");
+                startGame();
             };
             reader.readAsDataURL(coinImageInput.files[0]);
         } else {
@@ -565,12 +567,10 @@ function drawBackground(viewX, viewY, viewWidth, viewHeight) {
     ctx.fillStyle = "#1a1a1a";
     ctx.fillRect(viewX, viewY, viewWidth, viewHeight);
 
-    // Harita sınırlarını yeşil renkte çiz
-    ctx.strokeStyle = "lime"; // Yeşil renk
-    ctx.lineWidth = 5; // Çizgi kalınlığı
+    ctx.strokeStyle = "lime";
+    ctx.lineWidth = 5;
     ctx.strokeRect(0, 0, mapWidth, mapHeight);
 
-    // Arka plan ızgara çizgileri
     ctx.strokeStyle = "#333";
     ctx.lineWidth = 1;
     for (let x = Math.floor(viewX / 200) * 200; x <= viewX + viewWidth; x += 200) {
@@ -684,7 +684,7 @@ function checkCollisions() {
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < player.radius + dots[i].type.size) {
             player.marketcap += dots[i].wallet;
-            player.speed = Math.min(player.speed + 0.01, player.maxSpeed); // Hız artışını azalttık (0.05'ten 0.01'e)
+            player.speed = Math.min(player.speed + 0.01, player.maxSpeed);
             updateRadius(player);
 
             const holderAddress = generateRandomAddress();
@@ -877,13 +877,10 @@ function drawPlayer(p, worldMouseX, worldMouseY) {
 }
 
 function drawOtherPlayers(viewX, viewY, viewWidth, viewHeight) {
-    // Görünürlük kontrolünü sadeleştir
     for (let p of players) {
         if (p.id === player.id) continue;
-        // Oyuncunun görünür olup olmadığını kontrol et
         if (p.x > viewX - 100 && p.x < viewX + viewWidth + 100 && p.y > viewY - 100 && p.y < viewY + viewHeight + 100) {
             drawPlayer(p, p.x, p.y);
-            console.log("Drawing other player:", p); // Hata ayıklama için
         }
     }
 }
@@ -976,8 +973,13 @@ function drawTrail() {
     }
 }
 
-function gameLoop() {
+let lastTime = 0;
+
+function gameLoop(timestamp) {
     try {
+        const deltaTime = (timestamp - lastTime) / 16.67;
+        lastTime = timestamp;
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         if (!player.isAlive) {
@@ -989,7 +991,7 @@ function gameLoop() {
 
         let targetZoom = 100 / player.radius;
         targetZoom = Math.max(0.1, Math.min(1, targetZoom));
-        player.zoom += (targetZoom - player.zoom) * 0.05;
+        player.zoom += (targetZoom - player.zoom) * 0.05 * deltaTime;
 
         const viewX = player.x - (canvas.width / 2) / player.zoom;
         const viewY = player.y - (canvas.height / 2) / player.zoom;
@@ -1008,15 +1010,15 @@ function gameLoop() {
 
         if (player.isAlive) {
             const angle = Math.atan2(target.y - canvas.height / 2, target.x - canvas.width / 2);
-            const moveSpeed = boostActive ? player.speed * 2 : player.speed; // Boost etkisini azalttık (3'ten 2'ye)
-            player.x += Math.cos(angle) * moveSpeed * 0.5;
-            player.y += Math.sin(angle) * moveSpeed * 0.5;
+            const moveSpeed = boostActive ? player.speed * 2 : player.speed;
+            player.x += Math.cos(angle) * moveSpeed * 0.5 * deltaTime;
+            player.y += Math.sin(angle) * moveSpeed * 0.5 * deltaTime;
             player.x = Math.max(player.radius, Math.min(mapWidth - player.radius, player.x));
             player.y = Math.max(player.radius, Math.min(mapHeight - player.radius, player.y));
 
             if (boostActive && boostTimer > 0 && player.stamina > 0) {
-                player.stamina -= 100 / 1200;
-                boostTimer--;
+                player.stamina -= (100 / 1200) * deltaTime;
+                boostTimer -= deltaTime;
                 trail.push({ x: player.x, y: player.y, radius: 5, opacity: 0.5 });
                 if (player.stamina <= 0) {
                     boostActive = false;
@@ -1027,16 +1029,16 @@ function gameLoop() {
                 boostActive = false;
                 boostTimer = 0;
                 if (!player.boostCooldown) {
-                    player.stamina = Math.min(player.stamina + 0.1, player.maxStamina);
+                    player.stamina = Math.min(player.stamina + 0.1 * deltaTime, player.maxStamina);
                 } else if (player.stamina < player.maxStamina) {
-                    player.stamina += 0.1;
+                    player.stamina += 0.1 * deltaTime;
                     if (player.stamina >= player.maxStamina) {
                         player.boostCooldown = false;
                     }
                 }
             }
 
-            if (player.shakeTimer > 0) player.shakeTimer--;
+            if (player.shakeTimer > 0) player.shakeTimer -= deltaTime;
         }
 
         moveDots();
