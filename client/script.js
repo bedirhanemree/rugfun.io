@@ -115,9 +115,15 @@ function initializeDots() {
 initializeDots();
 
 const jeetImage = new Image();
-jeetImage.src = "jeet.png";
+jeetImage.src = "/jeet.png"; // Dosya yolunu netleştir
 const jeetAngryImage = new Image();
-jeetAngryImage.src = "jeet_angry.png";
+jeetAngryImage.src = "/jeet_angry.png"; // Dosya yolunu netleştir
+
+// Resim yükleme kontrolü
+jeetImage.onload = () => console.log("jeet.png loaded successfully");
+jeetImage.onerror = () => console.error("Failed to load jeet.png");
+jeetAngryImage.onload = () => console.log("jeet_angry.png loaded successfully");
+jeetAngryImage.onerror = () => console.error("Failed to load jeet_angry.png");
 
 const rugs = [];
 for (let i = 0; i < 5; i++) {
@@ -178,14 +184,14 @@ socket.on('player-died', (playerId) => {
 });
 
 socket.on('update-game-state', (gameState) => {
-    dots = gameState.dots;
-    jeets = gameState.jeets.map(jeet => ({
+    dots = gameState.dots || [];
+    jeets = (gameState.jeets || []).map(jeet => ({
         ...jeet,
         image: jeet.angry ? jeetAngryImage : jeetImage
     }));
-    rugs = gameState.rugs;
-    businesses = gameState.businesses;
-    console.log("Received jeets:", jeets); // Hata ayıklama için
+    rugs = gameState.rugs || [];
+    businesses = gameState.businesses || [];
+    console.log("Received game state - Jeets:", jeets.length, jeets); // Hata ayıklama
 });
 
 if (!startButton) {
@@ -434,7 +440,7 @@ function moveDots() {
         } else if (player.marketcap >= 500000) {
             if (dist < 300) {
                 dot.x += (dx / dist) * pullSpeed;
-                dot.y += (dy / dist) * pullSpeed;
+                dot.y += (dx / dist) * pullSpeed;
             } else {
                 dot.angle += (Math.random() - 0.5) * 0.3;
                 dot.x += Math.cos(dot.angle) * dot.type.speed;
@@ -485,24 +491,47 @@ function drawDots(viewX, viewY, viewWidth, viewHeight) {
 function drawJeets(viewX, viewY, viewWidth, viewHeight) {
     ctx.font = "12px Arial";
     ctx.textAlign = "center";
-    console.log(`Drawing ${jeets.length} jeets`); // Hata ayıklama
+    console.log(`Attempting to draw ${jeets.length} jeets`); // Hata ayıklama
     for (let jeet of jeets) {
-        if (jeet.x > viewX - jeet.radius && jeet.x < viewX + viewWidth + jeet.radius && jeet.y > viewY - jeet.radius && jeet.y < viewY + viewHeight + jeet.radius) {
-            console.log(`Drawing jeet at (${jeet.x}, ${jeet.y}) with wallet $${jeet.wallet}`); // Hata ayıklama
-            ctx.save();
-            ctx.globalAlpha = jeet.opacity || 1;
-            ctx.beginPath();
-            const shakeOffset = jeet.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
-            ctx.arc(jeet.x + shakeOffset, jeet.y + shakeOffset, jeet.radius, 0, Math.PI * 2);
-            ctx.clip();
-            ctx.drawImage(jeet.image, jeet.x - jeet.radius + shakeOffset, jeet.y - jeet.radius + shakeOffset, jeet.radius * 2, jeet.radius * 2);
-            ctx.restore();
+        if (
+            jeet.x > viewX - jeet.radius &&
+            jeet.x < viewX + viewWidth + jeet.radius &&
+            jeet.y > viewY - jeet.radius &&
+            jeet.y < viewY + viewHeight + jeet.radius
+        ) {
+            console.log(`Drawing jeet at (${jeet.x}, ${jeet.y}) with wallet $${jeet.wallet}, angry: ${jeet.angry}`); // Hata ayıklama
+            if (jeet.image && jeet.image.complete) {
+                ctx.save();
+                ctx.globalAlpha = jeet.opacity || 1;
+                ctx.beginPath();
+                const shakeOffset = jeet.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
+                ctx.arc(jeet.x + shakeOffset, jeet.y + shakeOffset, jeet.radius, 0, Math.PI * 2);
+                ctx.clip();
+                ctx.drawImage(
+                    jeet.image,
+                    jeet.x - jeet.radius + shakeOffset,
+                    jeet.y - jeet.radius + shakeOffset,
+                    jeet.radius * 2,
+                    jeet.radius * 2
+                );
+                ctx.restore();
+            } else {
+                // Resim yüklenemezse emoji ile çiz
+                ctx.save();
+                ctx.globalAlpha = jeet.opacity || 1;
+                ctx.font = "20px Arial";
+                ctx.fillStyle = jeet.angry ? "orange" : "red";
+                ctx.fillText("😈", jeet.x, jeet.y);
+                ctx.restore();
+                console.warn(`Jeet image not loaded for jeet at (${jeet.x}, ${jeet.y})`);
+            }
 
             if (jeet.flame) {
                 ctx.save();
                 ctx.globalAlpha = jeet.opacity || 1;
                 ctx.fillStyle = "orange";
                 ctx.beginPath();
+                const shakeOffset = jeet.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
                 ctx.moveTo(jeet.x - jeet.radius + shakeOffset, jeet.y + shakeOffset);
                 ctx.lineTo(jeet.x - jeet.radius - 20 + shakeOffset, jeet.y - 10 + shakeOffset);
                 ctx.lineTo(jeet.x - jeet.radius - 20 + shakeOffset, jeet.y + 10 + shakeOffset);
@@ -513,10 +542,21 @@ function drawJeets(viewX, viewY, viewWidth, viewHeight) {
             ctx.save();
             ctx.globalAlpha = jeet.opacity || 1;
             ctx.fillStyle = jeet.angry ? "orange" : "red";
-            ctx.fillText(jeet.angry ? "ANGRY JEET" : "JEET", jeet.x + shakeOffset, jeet.y - jeet.radius - 10 + shakeOffset);
+            const shakeOffset = jeet.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
+            ctx.fillText(
+                jeet.angry ? "ANGRY JEET" : "JEET",
+                jeet.x + shakeOffset,
+                jeet.y - jeet.radius - 10 + shakeOffset
+            );
             ctx.fillStyle = "white";
-            ctx.fillText(`$${formatMarketCap(jeet.wallet)}`, jeet.x + shakeOffset, jeet.y + jeet.radius + 15 + shakeOffset);
+            ctx.fillText(
+                `$${formatMarketCap(jeet.wallet)}`,
+                jeet.x + shakeOffset,
+                jeet.y + jeet.radius + 15 + shakeOffset
+            );
             ctx.restore();
+        } else {
+            console.log(`Jeet at (${jeet.x}, ${jeet.y}) is out of view`); // Hata ayıklama
         }
     }
 }
@@ -765,7 +805,7 @@ function drawPlayer(p, worldMouseX, worldMouseY) {
     ctx.textAlign = "center";
     ctx.fillText(p.name, p.x + shakeOffset, p.y - p.radius - 15 + shakeOffset);
     ctx.font = "12px Arial";
-    ctx.fillText(`$${formatMarketCap(p.marketcap)}`, p.x + shakeOffset, p.y + p.radius + 20 + shakeOffset);
+    ctx.fillText(`$${formatMarketCap(p.marketcap)}`, p.x + shakeOffset, y + p.radius + 20 + shakeOffset);
     ctx.fillText(`Holders: ${p.allHolders ? p.allHolders.length : 0}`, p.x + shakeOffset, p.y + p.radius + 35 + shakeOffset);
 }
 
