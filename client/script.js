@@ -90,7 +90,7 @@ const memecoinEmojis = ["🐶", "🐕", "🐸", "🧢", "🚀"];
 
 let dots = [];
 let trail = [];
-let jeets = []; // Jeets artık sunucudan gelecek
+let jeets = [];
 
 function initializeDots() {
     dots = [];
@@ -185,6 +185,7 @@ socket.on('update-game-state', (gameState) => {
     }));
     rugs = gameState.rugs;
     businesses = gameState.businesses;
+    console.log("Received jeets:", jeets); // Hata ayıklama için
 });
 
 if (!startButton) {
@@ -484,10 +485,12 @@ function drawDots(viewX, viewY, viewWidth, viewHeight) {
 function drawJeets(viewX, viewY, viewWidth, viewHeight) {
     ctx.font = "12px Arial";
     ctx.textAlign = "center";
+    console.log(`Drawing ${jeets.length} jeets`); // Hata ayıklama
     for (let jeet of jeets) {
-        if (jeet.x > viewX - 100 && jeet.x < viewX + viewWidth + 100 && jeet.y > viewY - 100 && jeet.y < viewY + viewHeight + 100) {
+        if (jeet.x > viewX - jeet.radius && jeet.x < viewX + viewWidth + jeet.radius && jeet.y > viewY - jeet.radius && jeet.y < viewY + viewHeight + jeet.radius) {
+            console.log(`Drawing jeet at (${jeet.x}, ${jeet.y}) with wallet $${jeet.wallet}`); // Hata ayıklama
             ctx.save();
-            ctx.globalAlpha = jeet.opacity;
+            ctx.globalAlpha = jeet.opacity || 1;
             ctx.beginPath();
             const shakeOffset = jeet.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
             ctx.arc(jeet.x + shakeOffset, jeet.y + shakeOffset, jeet.radius, 0, Math.PI * 2);
@@ -497,7 +500,7 @@ function drawJeets(viewX, viewY, viewWidth, viewHeight) {
 
             if (jeet.flame) {
                 ctx.save();
-                ctx.globalAlpha = jeet.opacity;
+                ctx.globalAlpha = jeet.opacity || 1;
                 ctx.fillStyle = "orange";
                 ctx.beginPath();
                 ctx.moveTo(jeet.x - jeet.radius + shakeOffset, jeet.y + shakeOffset);
@@ -508,7 +511,7 @@ function drawJeets(viewX, viewY, viewWidth, viewHeight) {
             }
 
             ctx.save();
-            ctx.globalAlpha = jeet.opacity;
+            ctx.globalAlpha = jeet.opacity || 1;
             ctx.fillStyle = jeet.angry ? "orange" : "red";
             ctx.fillText(jeet.angry ? "ANGRY JEET" : "JEET", jeet.x + shakeOffset, jeet.y - jeet.radius - 10 + shakeOffset);
             ctx.fillStyle = "white";
@@ -595,7 +598,7 @@ function checkJeetCollisions() {
         const dy = player.y - jeet.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < player.radius + jeet.radius && player.marketcap >= jeet.wallet && attachedJeets < 2) {
-            socket.emit('jeet-attached', index, player.id); // Sunucuya çarpışmayı bildir
+            socket.emit('jeet-attached', index, player.id);
         }
     });
 }
