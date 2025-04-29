@@ -38,17 +38,17 @@ let player = {
     allHolders: [],
     holders: [],
     hasBonded: false,
-    isAlive: true, // Oyuncunun hayatta olup olmadığını kontrol eden yeni özellik
+    isAlive: true,
 };
 
-function initializeSlimePoints() {
+function initializeSlimePoints(entity) {
     const numPoints = 20;
-    player.slimePoints = [];
+    entity.slimePoints = [];
     for (let i = 0; i < numPoints; i++) {
         const angle = (i / numPoints) * Math.PI * 2;
-        player.slimePoints.push({
-            x: player.x + Math.cos(angle) * player.radius,
-            y: player.y + Math.sin(angle) * player.radius,
+        entity.slimePoints.push({
+            x: entity.x + Math.cos(angle) * entity.radius,
+            y: entity.y + Math.sin(angle) * entity.radius,
             targetX: 0,
             targetY: 0,
             vx: 0,
@@ -57,7 +57,7 @@ function initializeSlimePoints() {
     }
 }
 
-initializeSlimePoints();
+initializeSlimePoints(player);
 
 function updateRadius(entity) {
     const baseRadius = 20;
@@ -65,7 +65,7 @@ function updateRadius(entity) {
     const multiplier = 60;
     entity.radius = baseRadius + (entity.marketcap || entity.wallet) / divisor * multiplier;
     entity.radius = Math.max(20, Math.min(100, entity.radius));
-    initializeSlimePoints();
+    initializeSlimePoints(entity);
 }
 
 updateRadius(player);
@@ -175,15 +175,33 @@ let businesses = [
 
 socket.on('init-players', (serverPlayers) => {
     players = serverPlayers;
+    // Her oyuncuya slimePoints ve slimeDeform ekle
+    players.forEach(p => {
+        if (!p.slimePoints) {
+            p.slimePoints = [];
+            initializeSlimePoints(p);
+        }
+        if (!p.slimeDeform) {
+            p.slimeDeform = 0;
+        }
+    });
 });
 
 socket.on('update-players', (serverPlayers) => {
     players = serverPlayers;
+    // Her oyuncuya slimePoints ve slimeDeform ekle
+    players.forEach(p => {
+        if (!p.slimePoints) {
+            p.slimePoints = [];
+            initializeSlimePoints(p);
+        }
+        if (!p.slimeDeform) {
+            p.slimeDeform = 0;
+        }
+    });
 });
 
-// Oyuncunun öldüğünü diğer oyunculara bildiren olay
 socket.on('player-died', (playerId) => {
-    // Ölen oyuncuyu players listesinden çıkar
     players = players.filter(p => p.id !== playerId);
 });
 
@@ -237,7 +255,17 @@ function startGame() {
     leaderboard.style.display = "block";
     coinInfo.style.display = "block";
     player.id = socket.id || "temp-" + Math.random().toString(36).substr(2, 9);
-    player.isAlive = true; // Oyuncuyu başlangıçta hayatta yap
+    player.isAlive = true;
+    player.marketcap = 1000;
+    player.speed = 2;
+    player.x = mapWidth / 2;
+    player.y = mapHeight / 2;
+    player.stamina = 100;
+    player.boostCooldown = false;
+    player.allHolders = [];
+    player.holders = [];
+    player.hasBonded = false;
+    updateRadius(player);
     requestAnimationFrame(gameLoop);
 }
 
@@ -265,7 +293,7 @@ function createExplosion(x, y, radius) {
         const angle = Math.random() * Math.PI * 2;
         const speed = Math.random() * 5 + 2;
         const size = Math.random() * 5 + 2;
-        const color = "hsl(0, 100%, 50%)"; // Sabit kırmızı renk (kırmızı tonlar)
+        const color = "hsl(0, 100%, 50%)";
         particles.push({
             x: x,
             y: y,
@@ -444,10 +472,14 @@ function moveJeets() {
                 player.marketcap -= stolenAmount;
                 if (player.marketcap <= 0) {
                     player.marketcap = 0;
-                    player.isAlive = false; // Oyuncuyu öldür
-                    createExplosion(player.x, player.y, player.radius); // Kırmızı partikül patlama efekti
-                    socket.emit('player-died', player.id); // Diğer oyunculara bildir
-                    setTimeout(respawnPlayer, 3000); // 3 saniye sonra oyuncuyu yeniden doğur
+                    player.isAlive = false;
+                    createExplosion(player.x, player.y, player.radius);
+                    socket.emit('player-died', player.id);
+                    setTimeout(() => {
+                        startScreen.style.display = "block";
+                        leaderboard.style.display = "none";
+                        coinInfo.style.display = "none";
+                    }, 2000); // 2 saniye sonra başlangıç ekranını göster
                 }
                 updateRadius(player);
                 createExplosion(jeet.x, jeet.y, jeet.radius);
@@ -537,7 +569,7 @@ function drawDots(viewX, viewY, viewWidth, viewHeight) {
 
 function drawJeets(viewX, viewY, viewWidth, viewHeight) {
     ctx.font = "12px Arial";
-    ctx.textAlign = "center";
+    ctx textAlign = "center";
     for (let jeet of jeets) {
         if (jeet.x > viewX - 100 && jeet.x < viewX + viewWidth + 100 && jeet.y > viewY - 100 && jeet.y < viewY + viewHeight + 100) {
             ctx.save();
@@ -614,7 +646,7 @@ function normalizeHolderPercentages() {
 }
 
 function checkCollisions() {
-    if (!player.isAlive) return; // Oyuncu ölüyse çarpışma kontrolü yapma
+    if (!player.isAlive) return;
     for (let i = dots.length - 1; i >= 0; i--) {
         const dx = player.x - dots[i].x;
         const dy = player.y - dots[i].y;
@@ -641,7 +673,7 @@ function checkCollisions() {
 }
 
 function checkJeetCollisions() {
-    if (!player.isAlive) return; // Oyuncu ölüyse çarpışma kontrolü yapma
+    if (!player.isAlive) return;
     const attachedJeets = jeets.filter(jeet => jeet.attached).length;
     for (let jeet of jeets) {
         if (jeet.attached || jeet.flame) continue;
@@ -658,7 +690,7 @@ function checkJeetCollisions() {
 }
 
 function checkRugCollisions() {
-    if (!player.isAlive) return; // Oyuncu ölüyse çarpışma kontrolü yapma
+    if (!player.isAlive) return;
     for (let rug of rugs) {
         if (!rug.active) continue;
         const dx = player.x - rug.x;
@@ -668,10 +700,14 @@ function checkRugCollisions() {
             player.marketcap *= 0.5;
             if (player.marketcap <= 0) {
                 player.marketcap = 0;
-                player.isAlive = false; // Oyuncuyu öldür
-                createExplosion(player.x, player.y, player.radius); // Kırmızı partikül patlama efekti
-                socket.emit('player-died', player.id); // Diğer oyunculara bildir
-                setTimeout(respawnPlayer, 3000); // 3 saniye sonra oyuncuyu yeniden doğur
+                player.isAlive = false;
+                createExplosion(player.x, player.y, player.radius);
+                socket.emit('player-died', player.id);
+                setTimeout(() => {
+                    startScreen.style.display = "block";
+                    leaderboard.style.display = "none";
+                    coinInfo.style.display = "none";
+                }, 2000); // 2 saniye sonra başlangıç ekranını göster
             }
             updateRadius(player);
             rug.active = false;
@@ -681,7 +717,7 @@ function checkRugCollisions() {
 }
 
 function checkBusinessCollisions() {
-    if (!player.isAlive) return; // Oyuncu ölüyse çarpışma kontrolü yapma
+    if (!player.isAlive) return;
     for (let business of businesses) {
         const dx = player.x - business.x;
         const dy = player.y - business.y;
@@ -707,7 +743,7 @@ function checkBusinessCollisions() {
 }
 
 function checkPlayerCollisions() {
-    if (!player.isAlive) return; // Oyuncu ölüyse çarpışma kontrolü yapma
+    if (!player.isAlive) return;
     for (let i = players.length - 1; i >= 0; i--) {
         const otherPlayer = players[i];
         if (otherPlayer.id === player.id) continue;
@@ -739,36 +775,8 @@ function checkPlayerCollisions() {
     }
 }
 
-function respawnPlayer() {
-    // Oyuncuyu yeniden doğur
-    player.isAlive = true;
-    player.marketcap = 1000;
-    player.speed = 2;
-    player.x = mapWidth / 2;
-    player.y = mapHeight / 2;
-    player.stamina = 100;
-    player.boostCooldown = false;
-    player.allHolders = [];
-    player.holders = [];
-    player.hasBonded = false;
-    updateRadius(player);
-
-    // Diğer oyunculara oyuncunun yeniden doğduğunu bildir
-    socket.emit('update-player', {
-        id: player.id,
-        x: player.x,
-        y: player.y,
-        marketcap: player.marketcap,
-        name: player.name,
-        image: player.image ? player.image.src : null,
-        radius: player.radius,
-        color: player.color,
-        speed: player.speed
-    });
-}
-
 function drawPlayer(p, worldMouseX, worldMouseY) {
-    if (!p.isAlive) return; // Oyuncu ölüyse çizme
+    if (!p.isAlive) return;
     const angleToMouse = Math.atan2(worldMouseY - p.y, worldMouseX - p.x);
     p.slimeDeform += 0.1;
     const numPoints = p.slimePoints.length;
@@ -835,41 +843,15 @@ function drawPlayer(p, worldMouseX, worldMouseY) {
     ctx.fillText(p.name, p.x + shakeOffset, p.y - p.radius - 15 + shakeOffset);
     ctx.font = "12px Arial";
     ctx.fillText(`$${formatMarketCap(p.marketcap)}`, p.x + shakeOffset, p.y + p.radius + 20 + shakeOffset);
-    ctx.fillText(`Holders: ${player.allHolders.length}`, p.x + shakeOffset, p.y + p.radius + 35 + shakeOffset);
+    ctx.fillText(`Holders: ${p.allHolders ? p.allHolders.length : 0}`, p.x + shakeOffset, p.y + p.radius + 35 + shakeOffset);
 }
 
 function drawOtherPlayers(viewX, viewY, viewWidth, viewHeight) {
     for (let p of players) {
         if (p.id === player.id) continue;
         if (p.x > viewX - 100 && p.x < viewX + viewWidth + 100 && p.y > viewY - 100 && p.y < viewY + viewHeight + 100) {
-            if (p.image) {
-                const img = new Image();
-                img.src = p.image;
-                ctx.save();
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-                ctx.clip();
-                ctx.drawImage(img, p.x - p.radius, p.y - p.radius, p.radius * 2, p.radius * 2);
-                ctx.restore();
-            } else {
-                ctx.fillStyle = p.color;
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            ctx.strokeStyle = "lime";
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-            ctx.stroke();
-
-            ctx.fillStyle = "white";
-            ctx.font = "14px Arial";
-            ctx.textAlign = "center";
-            ctx.fillText(p.name, p.x, p.y - p.radius - 15);
-
-            ctx.font = "12px Arial";
-            ctx.fillText(`$${formatMarketCap(p.marketcap)}`, p.x, p.y + p.radius + 20);
+            // Diğer oyuncuları da slime efektiyle çiz
+            drawPlayer(p, p.x, p.y); // worldMouseX ve worldMouseY yerine oyuncunun pozisyonunu kullanıyoruz
         }
     }
 }
@@ -985,7 +967,6 @@ function gameLoop() {
 
         drawBackground(viewX, viewY, viewWidth, viewHeight);
 
-        // Oyuncu hayattaysa hareket etsin
         if (player.isAlive) {
             const angle = Math.atan2(target.y - canvas.height / 2, target.x - canvas.width / 2);
             const moveSpeed = boostActive ? player.speed * 3 : player.speed;
