@@ -42,25 +42,29 @@ for (let i = 0; i < 1000; i++) {
 }
 
 let jeets = [];
-for (let i = 0; i < 20; i++) {
-    const wallet = Math.floor(Math.random() * (1000000 - 100000)) + 100000;
-    jeets.push({
-        x: Math.random() * mapWidth,
-        y: Math.random() * mapHeight,
-        radius: 20 + (wallet / 1000000) * 30,
-        speed: 1,
-        angle: Math.random() * Math.PI * 2,
-        angry: false,
-        angryTimer: 0,
-        wallet: wallet,
-        flame: false,
-        flameTimer: 0,
-        shakeTimer: 0,
-        attached: false,
-        attachTimer: 0,
-        orbitAngle: 0,
-        opacity: 1,
-    });
+function initializeJeets() {
+    jeets = [];
+    for (let i = 0; i < 20; i++) {
+        const wallet = Math.floor(Math.random() * (1000000 - 100000)) + 100000;
+        jeets.push({
+            x: Math.random() * mapWidth,
+            y: Math.random() * mapHeight,
+            radius: 20 + (wallet / 1000000) * 30,
+            speed: 1,
+            angle: Math.random() * Math.PI * 2,
+            angry: false,
+            angryTimer: 0,
+            wallet: wallet,
+            flame: false,
+            flameTimer: 0,
+            shakeTimer: 0,
+            attached: false,
+            attachedPlayerId: null,
+            attachTimer: 0,
+            orbitAngle: 0,
+            opacity: 1,
+        });
+    }
 }
 
 function spawnNewJeet() {
@@ -78,11 +82,14 @@ function spawnNewJeet() {
         flameTimer: 0,
         shakeTimer: 0,
         attached: false,
+        attachedPlayerId: null,
         attachTimer: 0,
         orbitAngle: 0,
         opacity: 1,
     };
 }
+
+initializeJeets();
 
 let rugs = [];
 for (let i = 0; i < 5; i++) {
@@ -99,21 +106,71 @@ let businesses = [
     { x: 800, y: 800, radius: 20, color: 'green', income: 50 }
 ];
 
-function moveDots() {
-    for (let dot of dots) {
-        dot.angle += (Math.random() - 0.5) * 0.3;
-        dot.x += Math.cos(dot.angle) * dot.type.speed;
-        dot.y += Math.sin(dot.angle) * dot.type.speed;
-
-        if (dot.x < 0 || dot.x > mapWidth) dot.angle = Math.PI - dot.angle;
-        if (dot.y < 0 || dot.y > mapHeight) dot.angle = -dot.angle;
-    }
+function updateRadius(entity) {
+    const baseRadius = 20;
+    const divisor = 1000000;
+    const multiplier = 60;
+    entity.radius = baseRadius + (entity.marketcap || entity.wallet) / divisor * multiplier;
+    entity.radius = Math.max(20, Math.min(100, entity.radius));
 }
 
 function moveJeets() {
     for (let i = 0; i < jeets.length; i++) {
         let jeet = jeets[i];
+        updateRadius(jeet);
+        if (jeet.attached) {
+            const player = players.find(p => p.id === jeet.attachedPlayerId);
+            if (!player || !player.isAlive) {
+                jeet.attached = false;
+                jeet.attachedPlayerId = null;
+                jeet.flame = true;
+                jeet.flameTimer = 120;
+                jeet.shakeTimer = 30;
+                jeet.angle = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2][Math.floor(Math.random() * 4)];
+                continue;
+            }
+
+            jeet.orbitAngle += 0.05;
+            const orbitRadius = player.radius + jeet.radius + 10;
+            jeet.x = player.x + Math.cos(jeet.orbitAngle) * orbitRadius;
+            jeet.y = player.y + Math.sin(jeet.orbitAngle) * orbitRadius;
+
+            jeet.attachTimer--;
+            if (jeet.attachTimer <= 0) {
+                jeet.attached = false;
+                jeet.attachedPlayerId = null;
+                jeet.flame = true;
+                jeet.flameTimer = 120;
+                jeet.shakeTimer = 30;
+                player.shakeTimer = 30;
+                const stolenAmount = jeet.wallet;
+                player.marketcap -= stolenAmount;
+                if (player.marketcap <= 0) {
+                    player.marketcap = 0;
+                    player.isAlive = false;
+                    io.emit('player-died', player.id);
+                }
+                updateRadius(player);
+                const edgeAngles = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
+                jeet.angle = edgeAngles[Math.floor(Math.random() * edgeAngles.length)];
+            }
+            continue;
+        }
+
         let jeetSpeed = jeet.speed;
+        let closestPlayer = null;
+        let minDist = Infinity;
+
+        for (let player of players) {
+            if (!player.isAlive) continue;
+            const dx = player.x - jeet.x;
+            const dy = player.y - jeet.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < minDist) {
+                minDist = dist;
+                closestPlayer = player;
+            }
+        }
 
         if (jeet.flame && jeet.flameTimer > 0) {
             jeetSpeed *= 5;
@@ -127,15 +184,43 @@ function moveJeets() {
                 jeets.push(spawnNewJeet());
                 i--;
             }
+        } else if (closestPlayer && minDist < 2000 && closestPlayer.marketcap >= jeet.wallet) {
+            if (!jeet.angry) {
+                jeet.angry = true;
+                jeet.angryTimer = 900;
+            }
+            if (jeet.angry) {
+                jeetSpeed *= 2;
+                const dx = closestPlayer.x - jeet.x;
+                const dy = closestPlayer.y - jeet.y;
+                jeet.angle = Math.atan2(dy, dx);
+                jeet.angryTimer--;
+                if (jeet.angryTimer <= 0) {
+                    jeet.angry = false;
+                }
+            }
         } else {
+            jeet.angry = false;
             jeet.angle += (Math.random() - 0.5) * 0.3;
-            jeet.x += Math.cos(jeet.angle) * jeetSpeed;
-            jeet.y += Math.sin(jeet.angle) * jeetSpeed;
-            if (jeet.x < 0 || jeet.x > mapWidth) jeet.angle = Math.PI - jeet.angle;
-            if (jeet.y < 0 || jeet.y > mapHeight) jeet.angle = -jeet.angle;
         }
 
+        jeet.x += Math.cos(jeet.angle) * jeetSpeed;
+        jeet.y += Math.sin(jeet.angle) * jeetSpeed;
+        if (jeet.x < 0 || jeet.x > mapWidth) jeet.angle = Math.PI - jeet.angle;
+        if (jeet.y < 0 || jeet.y > mapHeight) jeet.angle = -jeet.angle;
+
         if (jeet.shakeTimer > 0) jeet.shakeTimer--;
+    }
+}
+
+function moveDots() {
+    for (let dot of dots) {
+        dot.angle += (Math.random() - 0.5) * 0.3;
+        dot.x += Math.cos(dot.angle) * dot.type.speed;
+        dot.y += Math.sin(dot.angle) * dot.type.speed;
+
+        if (dot.x < 0 || dot.x > mapWidth) dot.angle = Math.PI - dot.angle;
+        if (dot.y < 0 || dot.y > mapHeight) dot.angle = -dot.angle;
     }
 }
 
@@ -174,13 +259,16 @@ io.on('connection', (socket) => {
         io.emit('update-game-state', { dots, jeets, rugs, businesses });
     });
 
-    socket.on('jeet-attached', (jeetIndex) => {
+    socket.on('jeet-attached', (jeetIndex, playerId) => {
         const jeet = jeets[jeetIndex];
-        jeet.attached = true;
-        jeet.orbitAngle = Math.random() * Math.PI * 2;
-        const attachDurations = [180, 300, 420, 600, 780];
-        jeet.attachTimer = attachDurations[Math.floor(Math.random() * attachDurations.length)];
-        io.emit('update-game-state', { dots, jeets, rugs, businesses });
+        if (jeet && !jeet.attached && !jeet.flame) {
+            jeet.attached = true;
+            jeet.attachedPlayerId = playerId;
+            jeet.orbitAngle = Math.random() * Math.PI * 2;
+            const attachDurations = [180, 300, 420, 600, 780];
+            jeet.attachTimer = attachDurations[Math.floor(Math.random() * attachDurations.length)];
+            io.emit('update-game-state', { dots, jeets, rugs, businesses });
+        }
     });
 
     socket.on('rug-collided', (rugIndex) => {
