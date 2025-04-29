@@ -35,6 +35,8 @@ let player = {
     boostCooldown: false,
     slimePoints: [],
     slimeDeform: 0,
+    holders: [],
+    hasBonded: false,
 };
 
 // Slime noktalarını başlat
@@ -64,8 +66,6 @@ function updateRadius(entity) {
     entity.radius = baseRadius + (entity.marketcap || entity.wallet) / divisor * multiplier;
     entity.radius = Math.max(20, Math.min(100, entity.radius));
     console.log(`Updated radius for ${entity.name || 'JEET'}: ${entity.radius}, Marketcap/Wallet: ${entity.marketcap || entity.wallet}`);
-
-    // Slime noktalarını yeniden başlat (radius değiştiğinde)
     initializeSlimePoints();
 }
 
@@ -293,13 +293,39 @@ function createExplosion(x, y, radius) {
     }
 }
 
+function createConfetti() {
+    const confettiCount = 100;
+    for (let i = 0; i < confettiCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 5 + 3;
+        const size = Math.random() * 5 + 2;
+        const color = `hsl(${Math.random() * 360}, 100%, 50%)`;
+        particles.push({
+            x: player.x,
+            y: player.y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            size: size,
+            color: color,
+            life: 60,
+            type: "confetti",
+        });
+    }
+}
+
 function updateParticles() {
     for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.x += p.vx;
         p.y += p.vy;
         p.life--;
-        p.size *= 0.95;
+        if (p.type === "confetti") {
+            p.vy += 0.1;
+            p.vx *= 0.99;
+            p.size *= 0.98;
+        } else {
+            p.size *= 0.95;
+        }
         if (p.life <= 0) {
             particles.splice(i, 1);
         }
@@ -309,9 +335,13 @@ function updateParticles() {
 function drawParticles() {
     for (let p of particles) {
         ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
+        if (p.type === "confetti") {
+            ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+        } else {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 }
 
@@ -503,6 +533,25 @@ function drawBusinesses(viewX, viewY, viewWidth, viewHeight) {
     }
 }
 
+function generateRandomAddress() {
+    const chars = "0123456789abcdef";
+    let address = "0x";
+    for (let i = 0; i < 8; i++) {
+        address += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return address;
+}
+
+function normalizeHolderPercentages() {
+    const totalPercentage = player.holders.reduce((sum, holder) => sum + holder.percentage, 0);
+    if (totalPercentage > 100) {
+        const scale = 100 / totalPercentage;
+        player.holders.forEach(holder => {
+            holder.percentage = (holder.percentage * scale).toFixed(2);
+        });
+    }
+}
+
 function checkCollisions() {
     for (let i = dots.length - 1; i >= 0; i--) {
         const dx = player.x - dots[i].x;
@@ -512,6 +561,18 @@ function checkCollisions() {
             player.marketcap += dots[i].wallet;
             player.speed = Math.min(player.speed + 0.05, player.maxSpeed);
             updateRadius(player);
+
+            const holderAddress = generateRandomAddress();
+            const percentage = (Math.random() * 4.9 + 0.1).toFixed(2);
+            player.holders.push({ address: holderAddress, percentage: parseFloat(percentage) });
+
+            player.holders.sort((a, b) => b.percentage - a.percentage);
+            if (player.holders.length > 5) {
+                player.holders = player.holders.slice(0, 5);
+            }
+
+            normalizeHolderPercentages();
+
             dots.splice(i, 1);
         }
     }
@@ -749,6 +810,35 @@ function drawLeaderboard() {
     }
 }
 
+function updateCoinInfo() {
+    const coinNameElement = document.getElementById("coinName");
+    if (coinNameElement) {
+        coinNameElement.innerText = player.name;
+    }
+
+    const topHoldersElement = document.getElementById("topHolders");
+    if (topHoldersElement) {
+        topHoldersElement.innerHTML = "";
+        player.holders.forEach((holder, index) => {
+            topHoldersElement.innerHTML += `${index + 1}. ${holder.address} - ${holder.percentage}%<br>`;
+        });
+    }
+
+    const bondingCurvePercentageElement = document.getElementById("bondingCurvePercentage");
+    const bondingCurveFillElement = document.getElementById("bondingCurveFill");
+    if (bondingCurvePercentageElement && bondingCurveFillElement) {
+        const maxMarketCap = 100000;
+        const percentage = Math.min((player.marketcap / maxMarketCap) * 100, 100);
+        bondingCurvePercentageElement.innerText = `${percentage.toFixed(1)}%`;
+        bondingCurveFillElement.style.width = `${percentage}%`;
+
+        if (percentage >= 100 && !player.hasBonded) {
+            player.hasBonded = true;
+            createConfetti();
+        }
+    }
+}
+
 function drawMinimap() {
     const miniWidth = 200;
     const miniHeight = 200;
@@ -816,6 +906,8 @@ function restartGame(e) {
         player.y = mapHeight / 2;
         player.stamina = 100;
         player.boostCooldown = false;
+        player.holders = [];
+        player.hasBonded = false;
         updateRadius(player);
         jeets = [];
         for (let i = 0; i < 20; i++) {
@@ -926,6 +1018,7 @@ function gameLoop() {
 
         drawMinimap();
         drawLeaderboard();
+        updateCoinInfo();
         drawStaminaBar();
 
         socket.emit('update-player', {
