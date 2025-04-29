@@ -6,6 +6,8 @@ const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const failedText = document.getElementById("failedText");
 const restartText = document.getElementById("restartText");
+const leaderboard = document.getElementById("leaderboard");
+const coinInfo = document.getElementById("coinInfo");
 
 const socket = io();
 
@@ -228,6 +230,8 @@ if (!startButton) {
 function startGame() {
     if (!startScreen) return;
     startScreen.style.display = "none";
+    leaderboard.style.display = "block"; // Leaderboard'ı göster
+    coinInfo.style.display = "block"; // Coin Info'yu göster
     gameStarted = true;
     player.id = socket.id || "temp-" + Math.random().toString(36).substr(2, 9);
     requestAnimationFrame(gameLoop);
@@ -802,7 +806,6 @@ function formatMarketCap(marketcap) {
 }
 
 function drawLeaderboard() {
-    const leaderboard = document.getElementById("leaderboard");
     if (leaderboard) {
         leaderboard.innerHTML = "Top Coins:<br>";
         players.sort((a, b) => b.marketcap - a.marketcap);
@@ -894,6 +897,8 @@ function showGameOver() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         startScreen.style.display = "block";
+        leaderboard.style.display = "none"; // Leaderboard'ı gizle
+        coinInfo.style.display = "none"; // Coin Info'yu gizle
         gameOver = false;
         gameStarted = false;
 
