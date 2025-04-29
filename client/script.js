@@ -102,21 +102,28 @@ function initializeDots() {
         else type = foodTypes[3];
 
         dots.push({
-            x: Math.random() * mapWidth,
-            y: Math.random() * mapHeight,
+            x: 5000 + (Math.random() - 0.5) * 2000, // Oyuncuya yakın başlat
+            y: 5000 + (Math.random() - 0.5) * 2000, // Oyuncuya yakın başlat
             type,
             wallet: Math.floor(Math.random() * (type.max - type.min)) + type.min,
             angle: Math.random() * Math.PI * 2,
         });
     }
+    console.log("Initialized dots:", dots.length); // Hata ayıklama
 }
 
 initializeDots();
 
 const jeetImage = new Image();
-jeetImage.src = "jeet.png";
+jeetImage.src = "/jeet.png"; // Dosya yolunu netleştir
 const jeetAngryImage = new Image();
-jeetAngryImage.src = "jeet_angry.png";
+jeetAngryImage.src = "/jeet_angry.png"; // Dosya yolunu netleştir
+
+// Resim yükleme kontrolü
+jeetImage.onload = () => console.log("jeet.png loaded successfully");
+jeetImage.onerror = () => console.error("Failed to load jeet.png");
+jeetAngryImage.onload = () => console.log("jeet_angry.png loaded successfully");
+jeetAngryImage.onerror = () => console.error("Failed to load jeet_angry.png");
 
 let jeets = [];
 function initializeJeets() {
@@ -124,8 +131,8 @@ function initializeJeets() {
     for (let i = 0; i < 20; i++) {
         const wallet = Math.floor(Math.random() * (1000000 - 100000)) + 100000;
         jeets.push({
-            x: Math.random() * mapWidth,
-            y: Math.random() * mapHeight,
+            x: 5000 + (Math.random() - 0.5) * 2000, // Oyuncuya yakın başlat
+            y: 5000 + (Math.random() - 0.5) * 2000, // Oyuncuya yakın başlat
             radius: 20 + (wallet / 1000000) * 30,
             speed: 1,
             angle: Math.random() * Math.PI * 2,
@@ -142,6 +149,7 @@ function initializeJeets() {
             opacity: 1,
         });
     }
+    console.log("Initialized jeets:", jeets.length); // Hata ayıklama
 }
 
 initializeJeets();
@@ -149,8 +157,8 @@ initializeJeets();
 function spawnNewJeet() {
     const wallet = Math.floor(Math.random() * (1000000 - 100000)) + 100000;
     return {
-        x: Math.random() * mapWidth,
-        y: Math.random() * mapHeight,
+        x: 5000 + (Math.random() - 0.5) * 2000, // Oyuncuya yakın başlat
+        y: 5000 + (Math.random() - 0.5) * 2000, // Oyuncuya yakın başlat
         radius: 20 + (wallet / 1000000) * 30,
         speed: 1,
         angle: Math.random() * Math.PI * 2,
@@ -224,6 +232,27 @@ socket.on('update-players', (serverPlayers) => {
 socket.on('player-died', (playerId) => {
     players = players.filter(p => p.id !== playerId);
     console.log("Player died, updated players:", players);
+});
+
+// Sunucudan game state alındığında sadece gerekliyse güncelle
+socket.on('update-game-state', (gameState) => {
+    console.log("Received game state:", gameState); // Hata ayıklama
+    if (gameState.dots && gameState.dots.length > 0) {
+        dots = gameState.dots;
+    } else {
+        console.warn("No dots received from server, keeping local dots");
+    }
+    if (gameState.jeets && gameState.jeets.length > 0) {
+        jeets = gameState.jeets.map(jeet => ({
+            ...jeet,
+            image: jeet.angry ? jeetAngryImage : jeetImage
+        }));
+    } else {
+        console.warn("No jeets received from server, keeping local jeets");
+    }
+    rugs = gameState.rugs || rugs;
+    businesses = gameState.businesses || businesses;
+    console.log("Updated jeets:", jeets.length, "Updated dots:", dots.length);
 });
 
 if (!startButton) {
@@ -569,6 +598,7 @@ function moveJeets() {
 
         if (jeet.shakeTimer > 0) jeet.shakeTimer--;
     }
+    console.log("Moved jeets:", jeets.length); // Hata ayıklama
 }
 
 function drawBackground(viewX, viewY, viewWidth, viewHeight) {
@@ -598,6 +628,7 @@ function drawBackground(viewX, viewY, viewWidth, viewHeight) {
 function drawDots(viewX, viewY, viewWidth, viewHeight) {
     ctx.font = "20px Arial";
     ctx.textAlign = "center";
+    console.log("Drawing dots:", dots.length); // Hata ayıklama
     for (let dot of dots) {
         if (dot.x > viewX - 50 && dot.x < viewX + viewWidth + 50 && dot.y > viewY - 50 && dot.y < viewY + viewHeight + 50) {
             ctx.fillStyle = dot.type.color;
@@ -609,22 +640,36 @@ function drawDots(viewX, viewY, viewWidth, viewHeight) {
 function drawJeets(viewX, viewY, viewWidth, viewHeight) {
     ctx.font = "12px Arial";
     ctx.textAlign = "center";
+    console.log("Drawing jeets:", jeets.length); // Hata ayıklama
     for (let jeet of jeets) {
         if (jeet.x > viewX - 100 && jeet.x < viewX + viewWidth + 100 && jeet.y > viewY - 100 && jeet.y < viewY + viewHeight + 100) {
-            ctx.save();
-            ctx.globalAlpha = jeet.opacity;
-            ctx.beginPath();
-            const shakeOffset = jeet.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
-            ctx.arc(jeet.x + shakeOffset, jeet.y + shakeOffset, jeet.radius, 0, Math.PI * 2);
-            ctx.clip();
-            ctx.drawImage(jeet.image, jeet.x - jeet.radius + shakeOffset, jeet.y - jeet.radius + shakeOffset, jeet.radius * 2, jeet.radius * 2);
-            ctx.restore();
+            console.log(`Drawing jeet at (${jeet.x}, ${jeet.y})`); // Hata ayıklama
+            if (jeet.image && jeet.image.complete) {
+                ctx.save();
+                ctx.globalAlpha = jeet.opacity;
+                ctx.beginPath();
+                const shakeOffset = jeet.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
+                ctx.arc(jeet.x + shakeOffset, jeet.y + shakeOffset, jeet.radius, 0, Math.PI * 2);
+                ctx.clip();
+                ctx.drawImage(jeet.image, jeet.x - jeet.radius + shakeOffset, jeet.y - jeet.radius + shakeOffset, jeet.radius * 2, jeet.radius * 2);
+                ctx.restore();
+            } else {
+                // Resim yüklenemezse emoji ile çiz
+                ctx.save();
+                ctx.globalAlpha = jeet.opacity;
+                ctx.font = "20px Arial";
+                ctx.fillStyle = jeet.angry ? "orange" : "red";
+                ctx.fillText("😈", jeet.x, jeet.y);
+                ctx.restore();
+                console.warn(`Jeet image not loaded for jeet at (${jeet.x}, ${jeet.y})`);
+            }
 
             if (jeet.flame) {
                 ctx.save();
                 ctx.globalAlpha = jeet.opacity;
                 ctx.fillStyle = "orange";
                 ctx.beginPath();
+                const shakeOffset = jeet.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
                 ctx.moveTo(jeet.x - jeet.radius + shakeOffset, jeet.y + shakeOffset);
                 ctx.lineTo(jeet.x - jeet.radius - 20 + shakeOffset, jeet.y - 10 + shakeOffset);
                 ctx.lineTo(jeet.x - jeet.radius - 20 + shakeOffset, jeet.y + 10 + shakeOffset);
@@ -635,10 +680,13 @@ function drawJeets(viewX, viewY, viewWidth, viewHeight) {
             ctx.save();
             ctx.globalAlpha = jeet.opacity;
             ctx.fillStyle = jeet.angry ? "orange" : "red";
+            const shakeOffset = jeet.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
             ctx.fillText(jeet.angry ? "ANGRY JEET" : "JEET", jeet.x + shakeOffset, jeet.y - jeet.radius - 10 + shakeOffset);
             ctx.fillStyle = "white";
             ctx.fillText(`$${formatMarketCap(jeet.wallet)}`, jeet.x + shakeOffset, jeet.y + jeet.radius + 15 + shakeOffset);
             ctx.restore();
+        } else {
+            console.log(`Jeet at (${jeet.x}, ${jeet.y}) is out of view`); // Hata ayıklama
         }
     }
 }
