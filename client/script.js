@@ -604,28 +604,37 @@ function checkFOMO() {
     }
 }
 
-function drawPlayer(p) {
-    const angleToMouse = Math.atan2(target.y - canvas.height / 2, target.x - canvas.width / 2);
+function drawPlayer(p, worldMouseX, worldMouseY) {
+    // Mouse yönünü dünya koordinatlarına göre hesapla
+    const angleToMouse = Math.atan2(worldMouseY - p.y, worldMouseX - p.x);
+    
+    // Slime deformasyonunu güncelle (dalgalanma efekti için)
     p.slimeDeform += 0.1;
+    
+    // Slime noktalarını oluştur (dalgalı kenar efekti)
     const numPoints = 20;
     const points = [];
     const baseRadius = p.radius;
-
+    
     for (let i = 0; i < numPoints; i++) {
         const angle = (i / numPoints) * Math.PI * 2;
-        let radiusOffset = Math.sin(p.slimeDeform + angle * 3) * 5;
+        let radiusOffset = Math.sin(p.slimeDeform + angle * 3) * 5; // Hafif dalgalanma
+        
+        // Mouse yönüne doğru uzama efekti
         const mouseInfluence = Math.cos(angle - angleToMouse);
-        radiusOffset += mouseInfluence * 10;
+        radiusOffset += mouseInfluence * 20; // Uzama efektini artırdık (10 yerine 20)
+        
         const radius = baseRadius + radiusOffset;
         const x = p.x + Math.cos(angle) * radius;
         const y = p.y + Math.sin(angle) * radius;
         points.push({ x, y });
     }
-
+    
+    // Slime'ı çiz
     ctx.beginPath();
     const shakeOffset = p.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
     ctx.moveTo(points[0].x + shakeOffset, points[0].y + shakeOffset);
-
+    
     for (let i = 1; i < points.length; i++) {
         const prev = points[i - 1];
         const curr = points[i];
@@ -634,11 +643,11 @@ function drawPlayer(p) {
         const yc = (curr.y + prev.y) / 2;
         ctx.quadraticCurveTo(prev.x, prev.y, xc, yc);
     }
-
+    
     ctx.closePath();
     ctx.shadowColor = "rgba(0, 255, 0, 0.5)";
     ctx.shadowBlur = 10;
-
+    
     if (p.image) {
         ctx.save();
         ctx.clip();
@@ -648,12 +657,12 @@ function drawPlayer(p) {
         ctx.fillStyle = p.color;
         ctx.fill();
     }
-
+    
     ctx.strokeStyle = "lime";
     ctx.lineWidth = 3;
     ctx.stroke();
     ctx.shadowBlur = 0;
-
+    
     ctx.fillStyle = "white";
     ctx.font = "14px Arial";
     ctx.textAlign = "center";
@@ -830,6 +839,9 @@ function gameLoop() {
         const viewWidth = canvas.width / player.zoom;
         const viewHeight = canvas.height / player.zoom;
 
+        const worldMouseX = player.x + (target.x - canvas.width / 2) / player.zoom;
+        const worldMouseY = player.y + (target.y - canvas.height / 2) / player.zoom;
+
         ctx.save();
         ctx.translate(canvas.width / 2, canvas.height / 2);
         ctx.scale(player.zoom, player.zoom);
@@ -882,7 +894,7 @@ function gameLoop() {
         drawRugs(viewX, viewY, viewWidth, viewHeight);
         drawBusinesses(viewX, viewY, viewWidth, viewHeight);
         drawTrail();
-        drawPlayer(player);
+        drawPlayer(player, worldMouseX, worldMouseY);
         drawOtherPlayers(viewX, viewY, viewWidth, viewHeight);
         drawParticles();
 
