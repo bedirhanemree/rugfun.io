@@ -157,8 +157,15 @@ io.on('connection', (socket) => {
         if (existingPlayer) {
             Object.assign(existingPlayer, playerData);
         } else {
-            players.push(playerData);
+            players.push({
+                ...playerData,
+                isAlive: true,
+                allHolders: playerData.allHolders || [],
+                slimePoints: playerData.slimePoints || [],
+                slimeDeform: playerData.slimeDeform || 0
+            });
         }
+        console.log('Updated players:', players);
         io.emit('update-players', players);
     });
 
