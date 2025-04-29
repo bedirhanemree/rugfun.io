@@ -26,7 +26,7 @@ let player = {
     marketcap: 1000,
     color: "#33ff33",
     speed: 2,
-    maxSpeed: 5,
+    maxSpeed: 3, // Hızı azalttık (5'ten 3'e)
     image: null,
     zoom: 1,
     stamina: 100,
@@ -65,7 +65,7 @@ function updateRadius(entity) {
     const multiplier = 60;
     entity.radius = baseRadius + (entity.marketcap || entity.wallet) / divisor * multiplier;
     entity.radius = Math.max(20, Math.min(100, entity.radius));
-    initializeSlimePoints(entity); // Her radius güncellemesinde slimePoints'i yeniden başlat
+    initializeSlimePoints(entity);
 }
 
 updateRadius(player);
@@ -207,10 +207,13 @@ socket.on('update-players', (serverPlayers) => {
             p.slimeDeform = 0;
         }
     });
+    // Players listesini kontrol et
+    console.log("Updated players:", players);
 });
 
 socket.on('player-died', (playerId) => {
     players = players.filter(p => p.id !== playerId);
+    console.log("Player died, updated players:", players);
 });
 
 if (!startButton) {
@@ -260,7 +263,6 @@ if (!startButton) {
 function startGame() {
     if (!startScreen) return;
 
-    // Tüm oyun durumlarını sıfırla
     player.id = socket.id || "temp-" + Math.random().toString(36).substr(2, 9);
     player.isAlive = true;
     player.marketcap = 1000;
@@ -278,21 +280,17 @@ function startGame() {
     player.slimeDeform = 0;
     updateRadius(player);
 
-    // Canvas'ı temizle
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // UI elemanlarını güncelle
     startScreen.style.display = "none";
     leaderboard.style.display = "block";
     coinInfo.style.display = "block";
 
-    // Oyun nesnelerini sıfırla
     initializeDots();
     initializeJeets();
     trail = [];
     particles = [];
 
-    // Oyun döngüsünü başlat
     requestAnimationFrame(gameLoop);
 }
 
@@ -567,6 +565,12 @@ function drawBackground(viewX, viewY, viewWidth, viewHeight) {
     ctx.fillStyle = "#1a1a1a";
     ctx.fillRect(viewX, viewY, viewWidth, viewHeight);
 
+    // Harita sınırlarını yeşil renkte çiz
+    ctx.strokeStyle = "lime"; // Yeşil renk
+    ctx.lineWidth = 5; // Çizgi kalınlığı
+    ctx.strokeRect(0, 0, mapWidth, mapHeight);
+
+    // Arka plan ızgara çizgileri
     ctx.strokeStyle = "#333";
     ctx.lineWidth = 1;
     for (let x = Math.floor(viewX / 200) * 200; x <= viewX + viewWidth; x += 200) {
@@ -596,7 +600,7 @@ function drawDots(viewX, viewY, viewWidth, viewHeight) {
 
 function drawJeets(viewX, viewY, viewWidth, viewHeight) {
     ctx.font = "12px Arial";
-    ctx.textAlign = "center"; // Düzeltildi: "ctx textAlign" yerine "ctx.textAlign"
+    ctx.textAlign = "center";
     for (let jeet of jeets) {
         if (jeet.x > viewX - 100 && jeet.x < viewX + viewWidth + 100 && jeet.y > viewY - 100 && jeet.y < viewY + viewHeight + 100) {
             ctx.save();
@@ -680,7 +684,7 @@ function checkCollisions() {
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < player.radius + dots[i].type.size) {
             player.marketcap += dots[i].wallet;
-            player.speed = Math.min(player.speed + 0.05, player.maxSpeed);
+            player.speed = Math.min(player.speed + 0.01, player.maxSpeed); // Hız artışını azalttık (0.05'ten 0.01'e)
             updateRadius(player);
 
             const holderAddress = generateRandomAddress();
@@ -805,7 +809,7 @@ function checkPlayerCollisions() {
 function drawPlayer(p, worldMouseX, worldMouseY) {
     if (!p.isAlive) return;
     const angleToMouse = Math.atan2(worldMouseY - p.y, worldMouseX - p.x);
-    p.slimeDeform += 0.05; // Deformasyon hızını azalttık (0.1'den 0.05'e)
+    p.slimeDeform += 0.05;
     const numPoints = p.slimePoints.length;
     const spring = 0.1;
     const friction = 0.85;
@@ -813,8 +817,8 @@ function drawPlayer(p, worldMouseX, worldMouseY) {
     for (let i = 0; i < numPoints; i++) {
         const point = p.slimePoints[i];
         const angle = (i / numPoints) * Math.PI * 2;
-        let radiusOffset = Math.sin(p.slimeDeform + angle * 2) * 3; // Deformasyon etkisini azalttık (5'ten 3'e)
-        const mouseInfluence = Math.cos(angle - angleToMouse) * 10; // Fare etkisini azalttık (30'dan 10'a)
+        let radiusOffset = Math.sin(p.slimeDeform + angle * 2) * 3;
+        const mouseInfluence = Math.cos(angle - angleToMouse) * 10;
         const targetRadius = p.radius + radiusOffset + mouseInfluence;
         point.targetX = p.x + Math.cos(angle) * targetRadius;
         point.targetY = p.y + Math.sin(angle) * targetRadius;
@@ -873,10 +877,13 @@ function drawPlayer(p, worldMouseX, worldMouseY) {
 }
 
 function drawOtherPlayers(viewX, viewY, viewWidth, viewHeight) {
+    // Görünürlük kontrolünü sadeleştir
     for (let p of players) {
         if (p.id === player.id) continue;
+        // Oyuncunun görünür olup olmadığını kontrol et
         if (p.x > viewX - 100 && p.x < viewX + viewWidth + 100 && p.y > viewY - 100 && p.y < viewY + viewHeight + 100) {
             drawPlayer(p, p.x, p.y);
+            console.log("Drawing other player:", p); // Hata ayıklama için
         }
     }
 }
@@ -971,10 +978,8 @@ function drawTrail() {
 
 function gameLoop() {
     try {
-        // Canvas'ı her zaman temizle
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Oyuncu hayatta değilse, sadece arka planı çiz ve döngüyü devam ettir
         if (!player.isAlive) {
             ctx.fillStyle = "#1a1a1a";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1003,7 +1008,7 @@ function gameLoop() {
 
         if (player.isAlive) {
             const angle = Math.atan2(target.y - canvas.height / 2, target.x - canvas.width / 2);
-            const moveSpeed = boostActive ? player.speed * 3 : player.speed;
+            const moveSpeed = boostActive ? player.speed * 2 : player.speed; // Boost etkisini azalttık (3'ten 2'ye)
             player.x += Math.cos(angle) * moveSpeed * 0.5;
             player.y += Math.sin(angle) * moveSpeed * 0.5;
             player.x = Math.max(player.radius, Math.min(mapWidth - player.radius, player.x));
@@ -1070,7 +1075,7 @@ function gameLoop() {
             speed: player.speed
         });
 
-        requestAnimationFrame(gameLoop);
+        requestAnimationFrame(gameLoop Towards);
     } catch (error) {
         console.error("Error in game loop:", error);
     }
