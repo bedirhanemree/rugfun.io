@@ -81,10 +81,10 @@ let boostTimer = 0;
 let particles = [];
 
 const foodTypes = [
-    { emoji: "🐛", min: 100, max: 1000, speed: 0.2, size: 8, color: "#66ff66" },
-    { emoji: "🐟", min: 1000, max: 5000, speed: 0.4, size: 12, color: "#66ccff" },
-    { emoji: "🦈", min: 5000, max: 10000, speed: 0.6, size: 16, color: "#ff9966" },
-    { emoji: "🐋", min: 10000, max: 100000, speed: 1.0, size: 24, color: "#ff66cc" },
+    { emoji: "🐛", min: 100, max: 1000, speed: 0.2, size: 8, color: "#66ff66" }, // Solucan
+    { emoji: "🐟", min: 1000, max: 5000, speed: 0.4, size: 12, color: "#66ccff" }, // Balık
+    { emoji: "🦈", min: 5000, max: 10000, speed: 0.6, size: 16, color: "#ff9966" }, // Yunus
+    { emoji: "🐋", min: 10000, max: 100000, speed: 1.0, size: 24, color: "#ff66cc" }, // Balina
 ];
 
 const memecoinNames = ["DOGEFUN", "SHIBKING", "PEPEMOON", "WIFHAT", "FLOKIROCKET"];
@@ -230,8 +230,8 @@ if (!startButton) {
 function startGame() {
     if (!startScreen) return;
     startScreen.style.display = "none";
-    leaderboard.style.display = "block"; // Leaderboard'ı göster
-    coinInfo.style.display = "block"; // Coin Info'yu göster
+    leaderboard.style.display = "block";
+    coinInfo.style.display = "block";
     gameStarted = true;
     player.id = socket.id || "temp-" + Math.random().toString(36).substr(2, 9);
     requestAnimationFrame(gameLoop);
@@ -332,28 +332,85 @@ function moveDots() {
         const dy = player.y - dot.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         const pullSpeed = 2;
+        const escapeSpeed = 2;
 
-        if (dot.type.emoji === "🐛" && player.marketcap < 100000) {
+        // Market cap'e göre yemlerin davranışını belirle
+        if (player.marketcap < 10000) {
+            // Market cap < 10K: Tüm yemler kaçacak
             if (dist < 500) {
-                dot.x += (dx / dist) * pullSpeed;
-                dot.y += (dy / dist) * pullSpeed;
-            }
-        } else if (dot.type.emoji === "🐟" && player.marketcap >= 200000) {
-            if (dist < 500) {
-                dot.x += (dx / dist) * pullSpeed;
-                dot.y += (dy / dist) * pullSpeed;
-            }
-        } else if ((dot.type.emoji === "🐋" || dot.type.emoji === "🦈") && player.marketcap < 500000) {
-            if (dist < 500) {
-                dot.x -= (dx / dist) * dot.type.speed * 2;
-                dot.y -= (dy / dist) * dot.type.speed * 2;
+                dot.x -= (dx / dist) * escapeSpeed;
+                dot.y -= (dy / dist) * escapeSpeed;
             } else {
                 dot.angle += (Math.random() - 0.5) * 0.3;
                 dot.x += Math.cos(dot.angle) * dot.type.speed;
                 dot.y += Math.sin(dot.angle) * dot.type.speed;
             }
-        } else {
-            if (dist < 100) {
+        } else if (player.marketcap >= 10000 && player.marketcap < 75000) {
+            // Market cap ≥ 10K ve < 75K: Solucanlar yaklaşacak, diğerleri kaçacak
+            if (dot.type.emoji === "🐛") {
+                if (dist < 500) {
+                    dot.x += (dx / dist) * pullSpeed;
+                    dot.y += (dy / dist) * pullSpeed;
+                } else {
+                    dot.angle += (Math.random() - 0.5) * 0.3;
+                    dot.x += Math.cos(dot.angle) * dot.type.speed;
+                    dot.y += Math.sin(dot.angle) * dot.type.speed;
+                }
+            } else {
+                if (dist < 500) {
+                    dot.x -= (dx / dist) * escapeSpeed;
+                    dot.y -= (dy / dist) * escapeSpeed;
+                } else {
+                    dot.angle += (Math.random() - 0.5) * 0.3;
+                    dot.x += Math.cos(dot.angle) * dot.type.speed;
+                    dot.y += Math.sin(dot.angle) * dot.type.speed;
+                }
+            }
+        } else if (player.marketcap >= 75000 && player.marketcap < 150000) {
+            // Market cap ≥ 75K ve < 150K: Solucanlar ve balıklar yaklaşacak, diğerleri kaçacak
+            if (dot.type.emoji === "🐛" || dot.type.emoji === "🐟") {
+                if (dist < 500) {
+                    dot.x += (dx / dist) * pullSpeed;
+                    dot.y += (dy / dist) * pullSpeed;
+                } else {
+                    dot.angle += (Math.random() - 0.5) * 0.3;
+                    dot.x += Math.cos(dot.angle) * dot.type.speed;
+                    dot.y += Math.sin(dot.angle) * dot.type.speed;
+                }
+            } else {
+                if (dist < 500) {
+                    dot.x -= (dx / dist) * escapeSpeed;
+                    dot.y -= (dy / dist) * escapeSpeed;
+                } else {
+                    dot.angle += (Math.random() - 0.5) * 0.3;
+                    dot.x += Math.cos(dot.angle) * dot.type.speed;
+                    dot.y += Math.sin(dot.angle) * dot.type.speed;
+                }
+            }
+        } else if (player.marketcap >= 150000 && player.marketcap < 500000) {
+            // Market cap ≥ 150K ve < 500K: Solucanlar, balıklar ve yunuslar yaklaşacak, balinalar kaçacak
+            if (dot.type.emoji === "🐛" || dot.type.emoji === "🐟" || dot.type.emoji === "🦈") {
+                if (dist < 500) {
+                    dot.x += (dx / dist) * pullSpeed;
+                    dot.y += (dy / dist) * pullSpeed;
+                } else {
+                    dot.angle += (Math.random() - 0.5) * 0.3;
+                    dot.x += Math.cos(dot.angle) * dot.type.speed;
+                    dot.y += Math.sin(dot.angle) * dot.type.speed;
+                }
+            } else {
+                if (dist < 500) {
+                    dot.x -= (dx / dist) * escapeSpeed;
+                    dot.y -= (dy / dist) * escapeSpeed;
+                } else {
+                    dot.angle += (Math.random() - 0.5) * 0.3;
+                    dot.x += Math.cos(dot.angle) * dot.type.speed;
+                    dot.y += Math.sin(dot.angle) * dot.type.speed;
+                }
+            }
+        } else if (player.marketcap >= 500000) {
+            // Market cap ≥ 500K: Tüm yemler yaklaşacak
+            if (dist < 500) {
                 dot.x += (dx / dist) * pullSpeed;
                 dot.y += (dy / dist) * pullSpeed;
             } else {
@@ -363,6 +420,7 @@ function moveDots() {
             }
         }
 
+        // Harita sınırları kontrolü
         if (dot.x < 0 || dot.x > mapWidth) dot.angle = Math.PI - dot.angle;
         if (dot.y < 0 || dot.y > mapHeight) dot.angle = -dot.angle;
     }
@@ -677,22 +735,6 @@ function checkPlayerCollisions() {
     }
 }
 
-function checkFOMO() {
-    const leader = players[0];
-    if (!leader || leader.id === player.id) return;
-    const dx = player.x - leader.x;
-    const dy = player.y - leader.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < 500) {
-        player.marketcap += 100;
-        updateRadius(player);
-        ctx.fillStyle = "yellow";
-        ctx.font = "16px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText("FOMO!", player.x, player.y - player.radius - 30);
-    }
-}
-
 function drawPlayer(p, worldMouseX, worldMouseY) {
     const angleToMouse = Math.atan2(worldMouseY - p.y, worldMouseX - p.x);
     p.slimeDeform += 0.1;
@@ -897,8 +939,8 @@ function showGameOver() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         startScreen.style.display = "block";
-        leaderboard.style.display = "none"; // Leaderboard'ı gizle
-        coinInfo.style.display = "none"; // Coin Info'yu gizle
+        leaderboard.style.display = "none";
+        coinInfo.style.display = "none";
         gameOver = false;
         gameStarted = false;
 
@@ -1002,7 +1044,6 @@ function gameLoop() {
         checkCollisions();
         checkJeetCollisions();
         checkRugCollisions();
-        checkFOMO();
         checkPlayerCollisions();
         checkBusinessCollisions();
         updateParticles();
