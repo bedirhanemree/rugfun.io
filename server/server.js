@@ -65,11 +65,12 @@ function initializeJeets() {
             opacity: 1,
         });
     }
+    console.log("Initialized jeets:", jeets); // Hata ayıklama
 }
 
 function spawnNewJeet() {
     const wallet = Math.floor(Math.random() * (1000000 - 100000)) + 100000;
-    return {
+    const newJeet = {
         x: Math.random() * mapWidth,
         y: Math.random() * mapHeight,
         radius: 20 + (wallet / 1000000) * 30,
@@ -87,6 +88,8 @@ function spawnNewJeet() {
         orbitAngle: 0,
         opacity: 1,
     };
+    console.log("Spawned new jeet:", newJeet); // Hata ayıklama
+    return newJeet;
 }
 
 initializeJeets();
@@ -211,6 +214,7 @@ function moveJeets() {
 
         if (jeet.shakeTimer > 0) jeet.shakeTimer--;
     }
+    console.log("Updated jeets:", jeets); // Hata ayıklama
 }
 
 function moveDots() {
@@ -267,6 +271,7 @@ io.on('connection', (socket) => {
             jeet.orbitAngle = Math.random() * Math.PI * 2;
             const attachDurations = [180, 300, 420, 600, 780];
             jeet.attachTimer = attachDurations[Math.floor(Math.random() * attachDurations.length)];
+            console.log(`Jeet ${jeetIndex} attached to player ${playerId}`); // Hata ayıklama
             io.emit('update-game-state', { dots, jeets, rugs, businesses });
         }
     });
