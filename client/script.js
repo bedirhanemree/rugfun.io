@@ -90,6 +90,7 @@ const memecoinEmojis = ["🐶", "🐕", "🐸", "🧢", "🚀"];
 
 let dots = [];
 let trail = [];
+let jeets = []; // Jeets artık sunucudan gelecek
 
 function initializeDots() {
     dots = [];
@@ -117,56 +118,6 @@ const jeetImage = new Image();
 jeetImage.src = "jeet.png";
 const jeetAngryImage = new Image();
 jeetAngryImage.src = "jeet_angry.png";
-
-let jeets = [];
-function initializeJeets() {
-    jeets = [];
-    for (let i = 0; i < 20; i++) {
-        const wallet = Math.floor(Math.random() * (1000000 - 100000)) + 100000;
-        jeets.push({
-            x: Math.random() * mapWidth,
-            y: Math.random() * mapHeight,
-            radius: 20 + (wallet / 1000000) * 30,
-            speed: 1,
-            angle: Math.random() * Math.PI * 2,
-            image: jeetImage,
-            angry: false,
-            angryTimer: 0,
-            wallet: wallet,
-            flame: false,
-            flameTimer: 0,
-            shakeTimer: 0,
-            attached: false,
-            attachTimer: 0,
-            orbitAngle: 0,
-            opacity: 1,
-        });
-    }
-}
-
-initializeJeets();
-
-function spawnNewJeet() {
-    const wallet = Math.floor(Math.random() * (1000000 - 100000)) + 100000;
-    return {
-        x: Math.random() * mapWidth,
-        y: Math.random() * mapHeight,
-        radius: 20 + (wallet / 1000000) * 30,
-        speed: 1,
-        angle: Math.random() * Math.PI * 2,
-        image: jeetImage,
-        angry: false,
-        angryTimer: 0,
-        wallet: wallet,
-        flame: false,
-        flameTimer: 0,
-        shakeTimer: 0,
-        attached: false,
-        attachTimer: 0,
-        orbitAngle: 0,
-        opacity: 1,
-    };
-}
 
 const rugs = [];
 for (let i = 0; i < 5; i++) {
@@ -224,6 +175,16 @@ socket.on('update-players', (serverPlayers) => {
 socket.on('player-died', (playerId) => {
     players = players.filter(p => p.id !== playerId);
     console.log("Player died, updated players:", players);
+});
+
+socket.on('update-game-state', (gameState) => {
+    dots = gameState.dots;
+    jeets = gameState.jeets.map(jeet => ({
+        ...jeet,
+        image: jeet.angry ? jeetAngryImage : jeetImage
+    }));
+    rugs = gameState.rugs;
+    businesses = gameState.businesses;
 });
 
 if (!startButton) {
@@ -297,7 +258,6 @@ function startGame() {
     coinInfo.style.display = "block";
 
     initializeDots();
-    initializeJeets();
     trail = [];
     particles = [];
 
@@ -486,91 +446,6 @@ function moveDots() {
     }
 }
 
-function moveJeets() {
-    for (let i = 0; i < jeets.length; i++) {
-        let jeet = jeets[i];
-        updateRadius(jeet);
-        if (jeet.attached) {
-            jeet.orbitAngle += 0.05;
-            const orbitRadius = player.radius + jeet.radius + 10;
-            jeet.x = player.x + Math.cos(jeet.orbitAngle) * orbitRadius;
-            jeet.y = player.y + Math.sin(jeet.orbitAngle) * orbitRadius;
-
-            jeet.attachTimer--;
-            if (jeet.attachTimer <= 0) {
-                jeet.attached = false;
-                jeet.flame = true;
-                jeet.flameTimer = 120;
-                jeet.shakeTimer = 30;
-                player.shakeTimer = 30;
-                const stolenAmount = jeet.wallet;
-                player.marketcap -= stolenAmount;
-                if (player.marketcap <= 0) {
-                    player.marketcap = 0;
-                    player.isAlive = false;
-                    createExplosion(player.x, player.y, player.radius);
-                    socket.emit('player-died', player.id);
-                    setTimeout(() => {
-                        startScreen.style.display = "block";
-                        leaderboard.style.display = "none";
-                        coinInfo.style.display = "none";
-                    }, 2000);
-                }
-                updateRadius(player);
-                createExplosion(jeet.x, jeet.y, jeet.radius);
-                const edgeAngles = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
-                jeet.angle = edgeAngles[Math.floor(Math.random() * edgeAngles.length)];
-            }
-            continue;
-        }
-
-        const dx = player.x - jeet.x;
-        const dy = player.y - jeet.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        let jeetSpeed = jeet.speed;
-
-        if (jeet.flame && jeet.flameTimer > 0) {
-            jeetSpeed *= 5;
-            jeet.flameTimer--;
-            jeet.opacity -= 1 / 120;
-            jeet.x += Math.cos(jeet.angle) * jeetSpeed;
-            jeet.y += Math.sin(jeet.angle) * jeetSpeed;
-
-            if (jeet.flameTimer <= 0 || jeet.x < 0 || jeet.x > mapWidth || jeet.y < 0 || jeet.y > mapHeight) {
-                jeets.splice(i, 1);
-                jeets.push(spawnNewJeet());
-                i--;
-            }
-        } else if (dist < 2000 && player.marketcap >= jeet.wallet) {
-            if (!jeet.angry) {
-                jeet.angry = true;
-                jeet.angryTimer = 900;
-            }
-            if (jeet.angry) {
-                jeet.image = jeetAngryImage;
-                jeetSpeed *= 2;
-                jeet.angle = Math.atan2(dy, dx);
-                jeet.angryTimer--;
-                if (jeet.angryTimer <= 0) {
-                    jeet.angry = false;
-                    jeet.image = jeetImage;
-                }
-            }
-        } else {
-            jeet.angry = false;
-            jeet.image = jeetImage;
-            jeet.angle += (Math.random() - 0.5) * 0.3;
-        }
-
-        jeet.x += Math.cos(jeet.angle) * jeetSpeed;
-        jeet.y += Math.sin(jeet.angle) * jeetSpeed;
-        if (jeet.x < 0 || jeet.x > mapWidth) jeet.angle = Math.PI - jeet.angle;
-        if (jeet.y < 0 || jeet.y > mapHeight) jeet.angle = -jeet.angle;
-
-        if (jeet.shakeTimer > 0) jeet.shakeTimer--;
-    }
-}
-
 function drawBackground(viewX, viewY, viewWidth, viewHeight) {
     ctx.fillStyle = "#1a1a1a";
     ctx.fillRect(viewX, viewY, viewWidth, viewHeight);
@@ -714,18 +589,15 @@ function checkCollisions() {
 function checkJeetCollisions() {
     if (!player.isAlive) return;
     const attachedJeets = jeets.filter(jeet => jeet.attached).length;
-    for (let jeet of jeets) {
-        if (jeet.attached || jeet.flame) continue;
+    jeets.forEach((jeet, index) => {
+        if (jeet.attached || jeet.flame) return;
         const dx = player.x - jeet.x;
         const dy = player.y - jeet.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < player.radius + jeet.radius && player.marketcap >= jeet.wallet && attachedJeets < 2) {
-            jeet.attached = true;
-            jeet.orbitAngle = Math.random() * Math.PI * 2;
-            const attachDurations = [180, 300, 420, 600, 780];
-            jeet.attachTimer = attachDurations[Math.floor(Math.random() * attachDurations.length)];
+            socket.emit('jeet-attached', index, player.id); // Sunucuya çarpışmayı bildir
         }
-    }
+    });
 }
 
 function checkRugCollisions() {
@@ -1058,7 +930,6 @@ function gameLoop() {
         }
 
         moveDots();
-        moveJeets();
         checkCollisions();
         checkJeetCollisions();
         checkRugCollisions();
