@@ -65,7 +65,7 @@ function initializeJeets() {
             opacity: 1,
         });
     }
-    console.log("Initialized jeets:", jeets); // Hata ayıklama
+    console.log("Initialized jeets:", jeets.length, jeets); // Hata ayıklama
 }
 
 function spawnNewJeet() {
@@ -118,7 +118,7 @@ function updateRadius(entity) {
 }
 
 function moveJeets() {
-    for (let i = 0; i < jeets.length; i++) {
+    for (let i = jeets.length - 1; i >= 0; i--) {
         let jeet = jeets[i];
         updateRadius(jeet);
         if (jeet.attached) {
@@ -185,7 +185,7 @@ function moveJeets() {
             if (jeet.flameTimer <= 0 || jeet.x < 0 || jeet.x > mapWidth || jeet.y < 0 || jeet.y > mapHeight) {
                 jeets.splice(i, 1);
                 jeets.push(spawnNewJeet());
-                i--;
+                continue;
             }
         } else if (closestPlayer && minDist < 2000 && closestPlayer.marketcap >= jeet.wallet) {
             if (!jeet.angry) {
@@ -214,7 +214,7 @@ function moveJeets() {
 
         if (jeet.shakeTimer > 0) jeet.shakeTimer--;
     }
-    console.log("Updated jeets:", jeets); // Hata ayıklama
+    console.log("Updated jeets:", jeets.length, jeets); // Hata ayıklama
 }
 
 function moveDots() {
@@ -231,6 +231,7 @@ function moveDots() {
 setInterval(() => {
     moveDots();
     moveJeets();
+    console.log("Sending game state - Jeets:", jeets.length); // Hata ayıklama
     io.emit('update-game-state', { dots, jeets, rugs, businesses });
 }, 1000 / 60);
 
