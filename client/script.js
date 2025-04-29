@@ -90,7 +90,6 @@ const memecoinEmojis = ["🐶", "🐕", "🐸", "🧢", "🚀"];
 
 let dots = [];
 let trail = [];
-let jeets = [];
 
 function initializeDots() {
     dots = [];
@@ -115,15 +114,59 @@ function initializeDots() {
 initializeDots();
 
 const jeetImage = new Image();
-jeetImage.src = "/jeet.png"; // Dosya yolunu netleştir
+jeetImage.src = "jeet.png";
 const jeetAngryImage = new Image();
-jeetAngryImage.src = "/jeet_angry.png"; // Dosya yolunu netleştir
+jeetAngryImage.src = "jeet_angry.png";
 
-// Resim yükleme kontrolü
-jeetImage.onload = () => console.log("jeet.png loaded successfully");
-jeetImage.onerror = () => console.error("Failed to load jeet.png");
-jeetAngryImage.onload = () => console.log("jeet_angry.png loaded successfully");
-jeetAngryImage.onerror = () => console.error("Failed to load jeet_angry.png");
+let jeets = [];
+function initializeJeets() {
+    jeets = [];
+    for (let i = 0; i < 20; i++) {
+        const wallet = Math.floor(Math.random() * (1000000 - 100000)) + 100000;
+        jeets.push({
+            x: Math.random() * mapWidth,
+            y: Math.random() * mapHeight,
+            radius: 20 + (wallet / 1000000) * 30,
+            speed: 1,
+            angle: Math.random() * Math.PI * 2,
+            image: jeetImage,
+            angry: false,
+            angryTimer: 0,
+            wallet: wallet,
+            flame: false,
+            flameTimer: 0,
+            shakeTimer: 0,
+            attached: false,
+            attachTimer: 0,
+            orbitAngle: 0,
+            opacity: 1,
+        });
+    }
+}
+
+initializeJeets();
+
+function spawnNewJeet() {
+    const wallet = Math.floor(Math.random() * (1000000 - 100000)) + 100000;
+    return {
+        x: Math.random() * mapWidth,
+        y: Math.random() * mapHeight,
+        radius: 20 + (wallet / 1000000) * 30,
+        speed: 1,
+        angle: Math.random() * Math.PI * 2,
+        image: jeetImage,
+        angry: false,
+        angryTimer: 0,
+        wallet: wallet,
+        flame: false,
+        flameTimer: 0,
+        shakeTimer: 0,
+        attached: false,
+        attachTimer: 0,
+        orbitAngle: 0,
+        opacity: 1,
+    };
+}
 
 const rugs = [];
 for (let i = 0; i < 5; i++) {
@@ -181,17 +224,6 @@ socket.on('update-players', (serverPlayers) => {
 socket.on('player-died', (playerId) => {
     players = players.filter(p => p.id !== playerId);
     console.log("Player died, updated players:", players);
-});
-
-socket.on('update-game-state', (gameState) => {
-    dots = gameState.dots || [];
-    jeets = (gameState.jeets || []).map(jeet => ({
-        ...jeet,
-        image: jeet.angry ? jeetAngryImage : jeetImage
-    }));
-    rugs = gameState.rugs || [];
-    businesses = gameState.businesses || [];
-    console.log("Received game state - Jeets:", jeets.length, jeets); // Hata ayıklama
 });
 
 if (!startButton) {
@@ -265,6 +297,7 @@ function startGame() {
     coinInfo.style.display = "block";
 
     initializeDots();
+    initializeJeets();
     trail = [];
     particles = [];
 
@@ -440,7 +473,7 @@ function moveDots() {
         } else if (player.marketcap >= 500000) {
             if (dist < 300) {
                 dot.x += (dx / dist) * pullSpeed;
-                dot.y += (dx / dist) * pullSpeed;
+                dot.y += (dy / dist) * pullSpeed;
             } else {
                 dot.angle += (Math.random() - 0.5) * 0.3;
                 dot.x += Math.cos(dot.angle) * dot.type.speed;
@@ -450,6 +483,91 @@ function moveDots() {
 
         if (dot.x < 0 || dot.x > mapWidth) dot.angle = Math.PI - dot.angle;
         if (dot.y < 0 || dot.y > mapHeight) dot.angle = -dot.angle;
+    }
+}
+
+function moveJeets() {
+    for (let i = 0; i < jeets.length; i++) {
+        let jeet = jeets[i];
+        updateRadius(jeet);
+        if (jeet.attached) {
+            jeet.orbitAngle += 0.05;
+            const orbitRadius = player.radius + jeet.radius + 10;
+            jeet.x = player.x + Math.cos(jeet.orbitAngle) * orbitRadius;
+            jeet.y = player.y + Math.sin(jeet.orbitAngle) * orbitRadius;
+
+            jeet.attachTimer--;
+            if (jeet.attachTimer <= 0) {
+                jeet.attached = false;
+                jeet.flame = true;
+                jeet.flameTimer = 120;
+                jeet.shakeTimer = 30;
+                player.shakeTimer = 30;
+                const stolenAmount = jeet.wallet;
+                player.marketcap -= stolenAmount;
+                if (player.marketcap <= 0) {
+                    player.marketcap = 0;
+                    player.isAlive = false;
+                    createExplosion(player.x, player.y, player.radius);
+                    socket.emit('player-died', player.id);
+                    setTimeout(() => {
+                        startScreen.style.display = "block";
+                        leaderboard.style.display = "none";
+                        coinInfo.style.display = "none";
+                    }, 2000);
+                }
+                updateRadius(player);
+                createExplosion(jeet.x, jeet.y, jeet.radius);
+                const edgeAngles = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
+                jeet.angle = edgeAngles[Math.floor(Math.random() * edgeAngles.length)];
+            }
+            continue;
+        }
+
+        const dx = player.x - jeet.x;
+        const dy = player.y - jeet.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        let jeetSpeed = jeet.speed;
+
+        if (jeet.flame && jeet.flameTimer > 0) {
+            jeetSpeed *= 5;
+            jeet.flameTimer--;
+            jeet.opacity -= 1 / 120;
+            jeet.x += Math.cos(jeet.angle) * jeetSpeed;
+            jeet.y += Math.sin(jeet.angle) * jeetSpeed;
+
+            if (jeet.flameTimer <= 0 || jeet.x < 0 || jeet.x > mapWidth || jeet.y < 0 || jeet.y > mapHeight) {
+                jeets.splice(i, 1);
+                jeets.push(spawnNewJeet());
+                i--;
+            }
+        } else if (dist < 2000 && player.marketcap >= jeet.wallet) {
+            if (!jeet.angry) {
+                jeet.angry = true;
+                jeet.angryTimer = 900;
+            }
+            if (jeet.angry) {
+                jeet.image = jeetAngryImage;
+                jeetSpeed *= 2;
+                jeet.angle = Math.atan2(dy, dx);
+                jeet.angryTimer--;
+                if (jeet.angryTimer <= 0) {
+                    jeet.angry = false;
+                    jeet.image = jeetImage;
+                }
+            }
+        } else {
+            jeet.angry = false;
+            jeet.image = jeetImage;
+            jeet.angle += (Math.random() - 0.5) * 0.3;
+        }
+
+        jeet.x += Math.cos(jeet.angle) * jeetSpeed;
+        jeet.y += Math.sin(jeet.angle) * jeetSpeed;
+        if (jeet.x < 0 || jeet.x > mapWidth) jeet.angle = Math.PI - jeet.angle;
+        if (jeet.y < 0 || jeet.y > mapHeight) jeet.angle = -jeet.angle;
+
+        if (jeet.shakeTimer > 0) jeet.shakeTimer--;
     }
 }
 
@@ -491,47 +609,22 @@ function drawDots(viewX, viewY, viewWidth, viewHeight) {
 function drawJeets(viewX, viewY, viewWidth, viewHeight) {
     ctx.font = "12px Arial";
     ctx.textAlign = "center";
-    console.log(`Attempting to draw ${jeets.length} jeets`); // Hata ayıklama
     for (let jeet of jeets) {
-        if (
-            jeet.x > viewX - jeet.radius &&
-            jeet.x < viewX + viewWidth + jeet.radius &&
-            jeet.y > viewY - jeet.radius &&
-            jeet.y < viewY + viewHeight + jeet.radius
-        ) {
-            console.log(`Drawing jeet at (${jeet.x}, ${jeet.y}) with wallet $${jeet.wallet}, angry: ${jeet.angry}`); // Hata ayıklama
-            if (jeet.image && jeet.image.complete) {
-                ctx.save();
-                ctx.globalAlpha = jeet.opacity || 1;
-                ctx.beginPath();
-                const shakeOffset = jeet.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
-                ctx.arc(jeet.x + shakeOffset, jeet.y + shakeOffset, jeet.radius, 0, Math.PI * 2);
-                ctx.clip();
-                ctx.drawImage(
-                    jeet.image,
-                    jeet.x - jeet.radius + shakeOffset,
-                    jeet.y - jeet.radius + shakeOffset,
-                    jeet.radius * 2,
-                    jeet.radius * 2
-                );
-                ctx.restore();
-            } else {
-                // Resim yüklenemezse emoji ile çiz
-                ctx.save();
-                ctx.globalAlpha = jeet.opacity || 1;
-                ctx.font = "20px Arial";
-                ctx.fillStyle = jeet.angry ? "orange" : "red";
-                ctx.fillText("😈", jeet.x, jeet.y);
-                ctx.restore();
-                console.warn(`Jeet image not loaded for jeet at (${jeet.x}, ${jeet.y})`);
-            }
+        if (jeet.x > viewX - 100 && jeet.x < viewX + viewWidth + 100 && jeet.y > viewY - 100 && jeet.y < viewY + viewHeight + 100) {
+            ctx.save();
+            ctx.globalAlpha = jeet.opacity;
+            ctx.beginPath();
+            const shakeOffset = jeet.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
+            ctx.arc(jeet.x + shakeOffset, jeet.y + shakeOffset, jeet.radius, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.drawImage(jeet.image, jeet.x - jeet.radius + shakeOffset, jeet.y - jeet.radius + shakeOffset, jeet.radius * 2, jeet.radius * 2);
+            ctx.restore();
 
             if (jeet.flame) {
                 ctx.save();
-                ctx.globalAlpha = jeet.opacity || 1;
+                ctx.globalAlpha = jeet.opacity;
                 ctx.fillStyle = "orange";
                 ctx.beginPath();
-                const shakeOffset = jeet.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
                 ctx.moveTo(jeet.x - jeet.radius + shakeOffset, jeet.y + shakeOffset);
                 ctx.lineTo(jeet.x - jeet.radius - 20 + shakeOffset, jeet.y - 10 + shakeOffset);
                 ctx.lineTo(jeet.x - jeet.radius - 20 + shakeOffset, jeet.y + 10 + shakeOffset);
@@ -540,23 +633,12 @@ function drawJeets(viewX, viewY, viewWidth, viewHeight) {
             }
 
             ctx.save();
-            ctx.globalAlpha = jeet.opacity || 1;
+            ctx.globalAlpha = jeet.opacity;
             ctx.fillStyle = jeet.angry ? "orange" : "red";
-            const shakeOffset = jeet.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
-            ctx.fillText(
-                jeet.angry ? "ANGRY JEET" : "JEET",
-                jeet.x + shakeOffset,
-                jeet.y - jeet.radius - 10 + shakeOffset
-            );
+            ctx.fillText(jeet.angry ? "ANGRY JEET" : "JEET", jeet.x + shakeOffset, jeet.y - jeet.radius - 10 + shakeOffset);
             ctx.fillStyle = "white";
-            ctx.fillText(
-                `$${formatMarketCap(jeet.wallet)}`,
-                jeet.x + shakeOffset,
-                jeet.y + jeet.radius + 15 + shakeOffset
-            );
+            ctx.fillText(`$${formatMarketCap(jeet.wallet)}`, jeet.x + shakeOffset, jeet.y + jeet.radius + 15 + shakeOffset);
             ctx.restore();
-        } else {
-            console.log(`Jeet at (${jeet.x}, ${jeet.y}) is out of view`); // Hata ayıklama
         }
     }
 }
@@ -632,15 +714,18 @@ function checkCollisions() {
 function checkJeetCollisions() {
     if (!player.isAlive) return;
     const attachedJeets = jeets.filter(jeet => jeet.attached).length;
-    jeets.forEach((jeet, index) => {
-        if (jeet.attached || jeet.flame) return;
+    for (let jeet of jeets) {
+        if (jeet.attached || jeet.flame) continue;
         const dx = player.x - jeet.x;
         const dy = player.y - jeet.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < player.radius + jeet.radius && player.marketcap >= jeet.wallet && attachedJeets < 2) {
-            socket.emit('jeet-attached', index, player.id);
+            jeet.attached = true;
+            jeet.orbitAngle = Math.random() * Math.PI * 2;
+            const attachDurations = [180, 300, 420, 600, 780];
+            jeet.attachTimer = attachDurations[Math.floor(Math.random() * attachDurations.length)];
         }
-    });
+    }
 }
 
 function checkRugCollisions() {
@@ -805,7 +890,7 @@ function drawPlayer(p, worldMouseX, worldMouseY) {
     ctx.textAlign = "center";
     ctx.fillText(p.name, p.x + shakeOffset, p.y - p.radius - 15 + shakeOffset);
     ctx.font = "12px Arial";
-    ctx.fillText(`$${formatMarketCap(p.marketcap)}`, p.x + shakeOffset, y + p.radius + 20 + shakeOffset);
+    ctx.fillText(`$${formatMarketCap(p.marketcap)}`, p.x + shakeOffset, p.y + p.radius + 20 + shakeOffset);
     ctx.fillText(`Holders: ${p.allHolders ? p.allHolders.length : 0}`, p.x + shakeOffset, p.y + p.radius + 35 + shakeOffset);
 }
 
@@ -973,6 +1058,7 @@ function gameLoop() {
         }
 
         moveDots();
+        moveJeets();
         checkCollisions();
         checkJeetCollisions();
         checkRugCollisions();
