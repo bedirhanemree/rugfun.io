@@ -419,7 +419,7 @@ function moveJeets() {
                     gameStarted = false;
                     showGameOver();
                 }
-                create explosion(jeet.x, jeet.y, jeet.radius);
+                createExplosion(jeet.x, jeet.y, jeet.radius);
                 const edgeAngles = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2];
                 jeet.angle = edgeAngles[Math.floor(Math.random() * edgeAngles.length)];
             }
