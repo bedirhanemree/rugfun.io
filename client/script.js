@@ -146,76 +146,81 @@ let businesses = [
 
 // Sunucudan gelen oyuncuları al
 socket.on('init-players', (serverPlayers) => {
+    console.log("Received init-players:", serverPlayers);
     players = serverPlayers;
 });
 
 socket.on('update-players', (serverPlayers) => {
+    console.log("Received update-players:", serverPlayers);
     players = serverPlayers;
 });
 
-// Socket bağlantısı tamamlanana kadar butonu devre dışı bırak
-startButton.disabled = true;
-
-socket.on('connect', () => {
-    console.log("Socket.io connected, ID:", socket.id);
-    startButton.disabled = false;
-});
-
-socket.on('connect_error', (error) => {
-    console.error("Socket.io connection error:", error);
-});
-
+// Socket bağlantısını kontrol et
 if (!startButton) {
     console.error("Start button not found! Check if 'startButton' ID exists in your HTML.");
+} else {
+    startButton.disabled = false; // Geçici olarak butonu aktif et
+
+    socket.on('connect', () => {
+        console.log("Socket.io connected, ID:", socket.id);
+        // startButton.disabled = false; // Bu satırı geçici olarak kaldırdık
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error("Socket.io connection error:", error);
+    });
+
+    startButton.addEventListener("click", () => {
+        console.log("Start button clicked!");
+
+        let name = coinNameInput.value.trim();
+        if (!name) {
+            const randomIndex = Math.floor(Math.random() * memecoinNames.length);
+            name = memecoinNames[randomIndex];
+            coinNameInput.value = name;
+        }
+        player.name = name;
+        console.log("Player name set to:", player.name);
+
+        if (coinImageInput.files.length > 0) {
+            console.log("Image selected, loading...");
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    console.log("Image loaded successfully!");
+                    player.image = img;
+                    startGame();
+                };
+                img.onerror = () => {
+                    console.error("Player image failed to load!");
+                    startGame();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(coinImageInput.files[0]);
+        } else {
+            console.log("No image selected, using emoji...");
+            const randomIndex = Math.floor(Math.random() * memecoinEmojis.length);
+            player.name += ` ${memecoinEmojis[randomIndex]}`;
+            startGame();
+        }
+    });
 }
-startButton.addEventListener("click", () => {
-    console.log("Start button clicked!");
 
-    let name = coinNameInput.value.trim();
-    if (!name) {
-        const randomIndex = Math.floor(Math.random() * memecoinNames.length);
-        name = memecoinNames[randomIndex];
-        coinNameInput.value = name;
+function startGame() {
+    console.log("startGame function called");
+    if (!startScreen) {
+        console.error("startScreen element not found!");
+        return;
     }
-    player.name = name;
-    console.log("Player name set to:", player.name);
-
-    if (coinImageInput.files.length > 0) {
-        console.log("Image selected, loading...");
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-                console.log("Image loaded successfully!");
-                player.image = img;
-                startScreen.style.display = "none";
-                gameStarted = true;
-                player.id = socket.id || "temp-" + Math.random().toString(36).substr(2, 9);
-                console.log("Game started, player ID:", player.id);
-                requestAnimationFrame(gameLoop);
-            };
-            img.onerror = () => {
-                console.error("Player image failed to load!");
-                startScreen.style.display = "none";
-                gameStarted = true;
-                player.id = socket.id || "temp-" + Math.random().toString(36).substr(2, 9);
-                console.log("Game started (image failed), player ID:", player.id);
-                requestAnimationFrame(gameLoop);
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(coinImageInput.files[0]);
-    } else {
-        console.log("No image selected, using emoji...");
-        const randomIndex = Math.floor(Math.random() * memecoinEmojis.length);
-        player.name += ` ${memecoinEmojis[randomIndex]}`;
-        startScreen.style.display = "none";
-        gameStarted = true;
-        player.id = socket.id || "temp-" + Math.random().toString(36).substr(2, 9);
-        console.log("Game started (no image), player ID:", player.id);
-        requestAnimationFrame(gameLoop);
-    }
-});
+    startScreen.style.display = "none";
+    gameStarted = true;
+    player.id = socket.id || "temp-" + Math.random().toString(36).substr(2, 9);
+    console.log("Game started, player ID:", player.id);
+    console.log("gameStarted set to:", gameStarted);
+    requestAnimationFrame(gameLoop);
+}
 
 window.addEventListener("mousemove", (e) => {
     target.x = e.clientX;
@@ -279,7 +284,7 @@ function drawParticles() {
 function updateRadius(entity) {
     const baseRadius = 20;
     const divisor = 1000000;
-    const multiplier = 60; // Değişiklik: 30 yerine 60, daha hızlı kütlesel büyüme
+    const multiplier = 60;
     entity.radius = baseRadius + (entity.marketcap || entity.wallet) / divisor * multiplier;
     entity.radius = Math.max(20, Math.min(100, entity.radius));
     console.log(`Updated radius for ${entity.name || 'JEET'}: ${entity.radius}, Marketcap/Wallet: ${entity.marketcap || entity.wallet}`);
@@ -356,7 +361,7 @@ function moveJeets() {
         } else if (dist < 2000 && player.marketcap >= jeet.wallet) {
             if (!jeet.angry) {
                 jeet.angry = true;
-                jeet.angryTimer = 900; // Değişiklik: 300 yerine 900 (15 saniye)
+                jeet.angryTimer = 900;
             }
             if (jeet.angry) {
                 jeet.image = jeetAngryImage;
@@ -414,7 +419,7 @@ function drawDots(viewX, viewY, viewWidth, viewHeight) {
     }
 }
 
-function draw�ets(viewX, viewY, viewWidth, viewHeight) {
+function drawJeets(viewX, viewY, viewWidth, viewHeight) {
     ctx.font = "12px Arial";
     ctx.textAlign = "center";
     for (let jeet of jeets) {
@@ -478,7 +483,7 @@ function checkCollisions() {
         const dx = player.x - dots[i].x;
         const dy = player.y - dots[i].y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (distunofficial&& dist < player.radius + dots[i].type.size) {
+        if (dist < player.radius + dots[i].type.size) {
             player.marketcap += dots[i].wallet;
             player.speed += 0.05;
             updateRadius(player);
@@ -777,7 +782,10 @@ function restartGame(e) {
 }
 
 function gameLoop() {
-    if (!gameStarted) return;
+    if (!gameStarted) {
+        console.log("gameLoop stopped: gameStarted is false");
+        return;
+    }
 
     try {
         console.log("Game loop running...");
@@ -800,7 +808,7 @@ function gameLoop() {
         drawBackground(viewX, viewY, viewWidth, viewHeight);
 
         const angle = Math.atan2(target.y - canvas.height / 2, target.x - canvas.width / 2);
-        const moveSpeed = boostActive ? player.speed * 2 : player.speed; // Değişiklik: *3 yerine *2
+        const moveSpeed = boostActive ? player.speed * 2 : player.speed;
         player.x += Math.cos(angle) * moveSpeed * 0.5;
         player.y += Math.sin(angle) * moveSpeed * 0.5;
         player.x = Math.max(player.radius, Math.min(mapWidth - player.radius, player.x));
