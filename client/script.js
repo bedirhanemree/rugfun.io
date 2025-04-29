@@ -21,98 +21,21 @@ let player = {
     id: Math.random().toString(36).substr(2, 9),
     x: mapWidth / 2,
     y: mapHeight / 2,
-    maxSpeed: 5,
     radius: 30,
     name: "RUGFUN",
     marketcap: 1000,
     color: "#33ff33",
     speed: 2,
+    maxSpeed: 5, // Hız sınırı
     image: null,
     zoom: 1,
     stamina: 100,
     maxStamina: 100,
     shakeTimer: 0,
     boostCooldown: false,
-    slimePoints: [],
-    slimeDeform: 0,
+    slimePoints: [], // Slime efekti için
+    slimeDeform: 0,  // Slime deformasyonu
 };
-
-function drawPlayer(p) {
-    // Mouse yönünü hesapla
-    const angleToMouse = Math.atan2(target.y - canvas.height / 2, target.x - canvas.width / 2);
-    
-    // Slime deformasyonunu güncelle (dalgalanma efekti için)
-    p.slimeDeform += 0.1;
-    
-    // Slime noktalarını oluştur (dalgalı kenar efekti)
-    const numPoints = 20; // Kenardaki nokta sayısı
-    const points = [];
-    const baseRadius = p.radius;
-    
-    for (let i = 0; i < numPoints; i++) {
-        const angle = (i / numPoints) * Math.PI * 2;
-        let radiusOffset = Math.sin(p.slimeDeform + angle * 3) * 5; // Hafif dalgalanma
-        
-        // Mouse yönüne doğru uzama efekti
-        const mouseInfluence = Math.cos(angle - angleToMouse);
-        radiusOffset += mouseInfluence * 10; // Mouse yönüne doğru 10 birim uzama
-        
-        const radius = baseRadius + radiusOffset;
-        const x = p.x + Math.cos(angle) * radius;
-        const y = p.y + Math.sin(angle) * radius;
-        points.push({ x, y });
-    }
-    
-    // Slime'ı çiz
-    ctx.beginPath();
-    const shakeOffset = p.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
-    ctx.moveTo(points[0].x + shakeOffset, points[0].y + shakeOffset);
-    
-    for (let i = 1; i < points.length; i++) {
-        const prev = points[i - 1];
-        const curr = points[i];
-        const next = points[(i + 1) % points.length];
-        
-        // Yumuşak eğriler için kontrol noktaları
-        const xc = (curr.x + prev.x) / 2;
-        const yc = (curr.y + prev.y) / 2;
-        ctx.quadraticCurveTo(prev.x, prev.y, xc, yc);
-    }
-    
-    // Kapat ve doldur
-    ctx.closePath();
-    
-    // Gölge efekti (slime hissiyatı için)
-    ctx.shadowColor = "rgba(0, 255, 0, 0.5)";
-    ctx.shadowBlur = 10;
-    
-    // Slime dolgusu
-    if (p.image) {
-        ctx.save();
-        ctx.clip();
-        ctx.drawImage(p.image, p.x - p.radius + shakeOffset, p.y - p.radius + shakeOffset, p.radius * 2, p.radius * 2);
-        ctx.restore();
-    } else {
-        ctx.fillStyle = p.color;
-        ctx.fill();
-    }
-    
-    // Kenar çizgisi
-    ctx.strokeStyle = "lime";
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    
-    // Gölgeyi sıfırla
-    ctx.shadowBlur = 0;
-    
-    // İsim ve market cap yazısı
-    ctx.fillStyle = "white";
-    ctx.font = "14px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(p.name, p.x + shakeOffset, p.y - p.radius - 15 + shakeOffset);
-    ctx.font = "12px Arial";
-    ctx.fillText(`$${formatMarketCap(p.marketcap)}`, p.x + shakeOffset, p.y + p.radius + 20 + shakeOffset);
-}
 
 // Oyuncunun başlangıç radius değerini marketcap'e göre güncelle
 updateRadius(player);
@@ -243,7 +166,6 @@ if (!startButton) {
 
     socket.on('connect', () => {
         console.log("Socket.io connected, ID:", socket.id);
-        // startButton.disabled = false; // Bu satırı geçici olarak kaldırdık
     });
 
     socket.on('connect_error', (error) => {
@@ -364,7 +286,7 @@ function drawParticles() {
 function updateRadius(entity) {
     const baseRadius = 20;
     const divisor = 1000000;
-    const multiplier = 60;
+    const multiplier = 60; // Daha hızlı kütlesel büyüme
     entity.radius = baseRadius + (entity.marketcap || entity.wallet) / divisor * multiplier;
     entity.radius = Math.max(20, Math.min(100, entity.radius));
     console.log(`Updated radius for ${entity.name || 'JEET'}: ${entity.radius}, Marketcap/Wallet: ${entity.marketcap || entity.wallet}`);
@@ -441,7 +363,7 @@ function moveJeets() {
         } else if (dist < 2000 && player.marketcap >= jeet.wallet) {
             if (!jeet.angry) {
                 jeet.angry = true;
-                jeet.angryTimer = 900;
+                jeet.angryTimer = 900; // 15 saniye kovalama
             }
             if (jeet.angry) {
                 jeet.image = jeetAngryImage;
@@ -565,8 +487,7 @@ function checkCollisions() {
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < player.radius + dots[i].type.size) {
             player.marketcap += dots[i].wallet;
-            player.speed = Math.min(player.speed + 0.05, player.maxSpeed);
-            player.speed += 0.05;
+            player.speed = Math.min(player.speed + 0.05, player.maxSpeed); // Hız sınırı
             updateRadius(player);
             dots.splice(i, 1);
         }
@@ -683,34 +604,80 @@ function checkFOMO() {
 }
 
 function drawPlayer(p) {
+    // Mouse yönünü hesapla
+    const angleToMouse = Math.atan2(target.y - canvas.height / 2, target.x - canvas.width / 2);
+    
+    // Slime deformasyonunu güncelle (dalgalanma efekti için)
+    p.slimeDeform += 0.1;
+    
+    // Slime noktalarını oluştur (dalgalı kenar efekti)
+    const numPoints = 20; // Kenardaki nokta sayısı
+    const points = [];
+    const baseRadius = p.radius;
+    
+    for (let i = 0; i < numPoints; i++) {
+        const angle = (i / numPoints) * Math.PI * 2;
+        let radiusOffset = Math.sin(p.slimeDeform + angle * 3) * 5; // Hafif dalgalanma
+        
+        // Mouse yönüne doğru uzama efekti
+        const mouseInfluence = Math.cos(angle - angleToMouse);
+        radiusOffset += mouseInfluence * 10; // Mouse yönüne doğru 10 birim uzama
+        
+        const radius = baseRadius + radiusOffset;
+        const x = p.x + Math.cos(angle) * radius;
+        const y = p.y + Math.sin(angle) * radius;
+        points.push({ x, y });
+    }
+    
+    // Slime'ı çiz
+    ctx.beginPath();
+    const shakeOffset = p.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
+    ctx.moveTo(points[0].x + shakeOffset, points[0].y + shakeOffset);
+    
+    for (let i = 1; i < points.length; i++) {
+        const prev = points[i - 1];
+        const curr = points[i];
+        const next = points[(i + 1) % points.length];
+        
+        // Yumuşak eğriler için kontrol noktaları
+        const xc = (curr.x + prev.x) / 2;
+        const yc = (curr.y + prev.y) / 2;
+        ctx.quadraticCurveTo(prev.x, prev.y, xc, yc);
+    }
+    
+    // Kapat ve doldur
+    ctx.closePath();
+    
+    // Gölge efekti (slime hissiyatı için)
+    ctx.shadowColor = "rgba(0, 255, 0, 0.5)";
+    ctx.shadowBlur = 10;
+    
+    // Slime dolgusu
     if (p.image) {
         ctx.save();
-        ctx.beginPath();
-        const shakeOffset = p.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
-        ctx.arc(p.x + shakeOffset, p.y + shakeOffset, p.radius, 0, Math.PI * 2);
         ctx.clip();
         ctx.drawImage(p.image, p.x - p.radius + shakeOffset, p.y - p.radius + shakeOffset, p.radius * 2, p.radius * 2);
         ctx.restore();
     } else {
         ctx.fillStyle = p.color;
-        ctx.beginPath();
-        const shakeOffset = p.shakeTimer > 0 ? (Math.random() - 0.5) * 5 : 0;
-        ctx.arc(p.x + shakeOffset, p.y + shakeOffset, p.radius, 0, Math.PI * 2);
         ctx.fill();
     }
+    
+    // Kenar çizgisi
     ctx.strokeStyle = "lime";
     ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
     ctx.stroke();
-
+    
+    // Gölgeyi sıfırla
+    ctx.shadowBlur = 0;
+    
+    // İsim ve market cap yazısı
     ctx.fillStyle = "white";
     ctx.font = "14px Arial";
     ctx.textAlign = "center";
-    ctx.fillText(p.name, p.x, p.y - p.radius - 15);
-
+    ctx.fillText(p.name, p.x + shakeOffset, p.y - p.radius - 15 + shakeOffset);
     ctx.font = "12px Arial";
-    ctx.fillText(`$${formatMarketCap(p.marketcap)}`, p.x, p.y + p.radius + 20);
+    ctx.fillText(`$${formatMarketCap(p.marketcap)}`, p.x + shakeOffset, p.y + p.radius + 20 + shakeOffset);
 }
 
 function drawOtherPlayers(viewX, viewY, viewWidth, viewHeight) {
@@ -760,7 +727,7 @@ function drawLeaderboard() {
     if (leaderboard) {
         leaderboard.innerHTML = "Top Coins:<br>";
         players.sort((a, b) => b.marketcap - a.marketcap);
-        for (let i = 0; i < Math.min(players.length, 5); i++) {
+        for let i = 0; i < Math.min(players.length, 5); i++) {
             const p = players[i];
             leaderboard.innerHTML += `${i + 1}. ${p.name} ($${formatMarketCap(p.marketcap)})<br>`;
         }
@@ -889,21 +856,11 @@ function gameLoop() {
         drawBackground(viewX, viewY, viewWidth, viewHeight);
 
         const angle = Math.atan2(target.y - canvas.height / 2, target.x - canvas.width / 2);
-        const moveSpeed = boostActive ? player.speed * 2 : player.speed;
+        const moveSpeed = boostActive ? player.speed * 2 : player.speed; // Nitro hızı düşürüldü (*3 yerine *2)
         player.x += Math.cos(angle) * moveSpeed * 0.5;
         player.y += Math.sin(angle) * moveSpeed * 0.5;
         player.x = Math.max(player.radius, Math.min(mapWidth - player.radius, player.x));
         player.y = Math.max(player.radius, Math.min(mapHeight - player.radius, player.y));
-
-            drawPlayer(player); // Bu satırın olduğundan emin ol
-        drawOtherPlayers(viewX, viewY, viewWidth, viewHeight);
-        drawParticles();
-
-        ctx.restore();
-
-        drawMinimap();
-        drawLeaderboard();
-        drawStaminaBar();
 
         if (boostActive && boostTimer > 0 && player.stamina > 0) {
             player.stamina -= 100 / 900;
