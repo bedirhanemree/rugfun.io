@@ -18,6 +18,50 @@ body {
     font-size: 18;
 }
 
+#coinInfo {
+    position: absolute;
+    top: 220px; /* Leaderboard'ın hemen altına yerleştir */
+    right: 10px;
+    color: white;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+}
+
+#coinName {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+#topHoldersTitle {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+#topHolders {
+    margin-bottom: 10px;
+}
+
+#bondingCurve {
+    margin-top: 10px;
+}
+
+#bondingCurveBar {
+    width: 150px;
+    height: 10px;
+    background-color: #333;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+#bondingCurveFill {
+    height: 100%;
+    background-color: lime;
+    width: 0%; /* Başlangıçta 0%, market cap'e göre dolacak */
+    transition: width 0.5s ease; /* Yumuşak dolma animasyonu */
+}
+
 #startScreen input, #startScreen button {
     margin: 10px;
     padding: 10px;
